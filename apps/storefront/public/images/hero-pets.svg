@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520">
+  <!-- KUDL Pets hero illustration: dog + cat, flat geometric -->
+  <path d="M320 44 C430 44 528 118 540 232 C552 346 470 442 344 452 C218 462 108 400 96 288 C84 176 210 44 320 44 Z" fill="#E8F6EF"/>
+
+  <!-- decorative paw marks on the blob -->
+  <g fill="#2F7D5B" opacity="0.14">
+    <ellipse cx="150" cy="152" rx="13" ry="10"/>
+    <circle cx="137" cy="135" r="5"/>
+    <circle cx="150" cy="130" r="5"/>
+    <circle cx="163" cy="135" r="5"/>
+  </g>
+  <g fill="#2F7D5B" opacity="0.14">
+    <ellipse cx="520" cy="360" rx="11" ry="8"/>
+    <circle cx="509" cy="346" r="4"/>
+    <circle cx="520" cy="342" r="4"/>
+    <circle cx="531" cy="346" r="4"/>
+  </g>
+
+  <!-- ground shadow -->
+  <ellipse cx="326" cy="442" rx="164" ry="17" fill="#2F7D5B" opacity="0.10"/>
+
+  <!-- ================= DOG (left, larger) ================= -->
+  <path d="M162 372 c-34 -4 -50 -30 -44 -56" fill="none" stroke="#C8925A" stroke-width="24" stroke-linecap="round"/>
+  <rect x="176" y="400" width="46" height="36" rx="18" fill="#C8925A"/>
+  <rect x="250" y="400" width="46" height="36" rx="18" fill="#C8925A"/>
+  <path d="M236 250 c52 0 74 58 74 106 c0 42 -32 66 -74 66 c-42 0 -74 -24 -74 -66 c0 -48 22 -106 74 -106 Z" fill="#E8B87D"/>
+  <ellipse cx="236" cy="388" rx="32" ry="38" fill="#FFFFFF"/>
+  <rect x="180" y="404" width="38" height="30" rx="15" fill="#FFFFFF"/>
+  <rect x="254" y="404" width="38" height="30" rx="15" fill="#FFFFFF"/>
+
+  <ellipse cx="160" cy="192" rx="27" ry="52" transform="rotate(-16 160 192)" fill="#C8925A"/>
+  <ellipse cx="312" cy="192" rx="27" ry="52" transform="rotate(16 312 192)" fill="#C8925A"/>
+  <circle cx="236" cy="214" r="86" fill="#E8B87D"/>
+  <circle cx="206" cy="198" r="27" fill="#C8925A"/>
+  <ellipse cx="236" cy="252" rx="52" ry="37" fill="#FFFFFF"/>
+  <circle cx="206" cy="198" r="9.5" fill="#171717"/>
+  <circle cx="266" cy="198" r="9.5" fill="#171717"/>
+  <circle cx="209.5" cy="194.5" r="3" fill="#FFFFFF"/>
+  <circle cx="269.5" cy="194.5" r="3" fill="#FFFFFF"/>
+  <ellipse cx="236" cy="236" rx="15" ry="11" fill="#171717"/>
+  <path d="M236 248 v13 M236 261 c-10 12 -26 9 -30 -4 M236 261 c10 12 26 9 30 -4" fill="none" stroke="#171717" stroke-width="4" stroke-linecap="round"/>
+
+  <path d="M186 292 q50 26 100 0" fill="none" stroke="#2F7D5B" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="236" cy="314" r="11" fill="#245F46"/>
+
+  <!-- ================= CAT (right) ================= -->
+  <path d="M512 400 c40 -6 54 -44 38 -74" fill="none" stroke="#2F7D5B" stroke-width="20" stroke-linecap="round"/>
+  <path d="M452 288 c44 0 62 50 62 92 c0 36 -28 54 -62 54 c-34 0 -62 -18 -62 -54 c0 -42 18 -92 62 -92 Z" fill="#245F46"/>
+  <ellipse cx="452" cy="400" rx="24" ry="28" fill="#2F7D5B"/>
+  <rect x="412" y="410" width="36" height="28" rx="14" fill="#2F7D5B"/>
+  <rect x="456" y="410" width="36" height="28" rx="14" fill="#2F7D5B"/>
+
+  <path d="M410 196 L400 148 L444 172 Z" fill="#245F46"/>
+  <path d="M494 196 L504 148 L460 172 Z" fill="#245F46"/>
+  <path d="M412 191 L406 161 L432 176 Z" fill="#2F7D5B"/>
+  <path d="M492 191 L498 161 L472 176 Z" fill="#2F7D5B"/>
+  <circle cx="452" cy="248" r="66" fill="#245F46"/>
+  <ellipse cx="428" cy="240" rx="10" ry="13" fill="#E8F6EF"/>
+  <ellipse cx="476" cy="240" rx="10" ry="13" fill="#E8F6EF"/>
+  <ellipse cx="428" cy="240" rx="4.5" ry="10" fill="#171717"/>
+  <ellipse cx="476" cy="240" rx="4.5" ry="10" fill="#171717"/>
+  <ellipse cx="452" cy="274" rx="26" ry="19" fill="#E8F6EF"/>
+  <path d="M443 266 h18 l-9 10 Z" fill="#E8B87D"/>
+  <path d="M452 276 v5 M452 281 c-6 7 -15 5 -18 -3 M452 281 c6 7 15 5 18 -3" fill="none" stroke="#245F46" stroke-width="3" stroke-linecap="round"/>
+  <path d="M428 272 L402 266 M428 279 L404 282 M476 272 L502 266 M476 279 L500 282" fill="none" stroke="#E8F6EF" stroke-width="3" stroke-linecap="round"/>
+
+  <path d="M416 320 q36 20 72 0" fill="none" stroke="#E8F6EF" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="452" cy="336" r="9" fill="#E8B87D"/>
+</svg>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <clipPath id="iconBallClip">
+      <circle cx="48" cy="48" r="32"/>
+    </clipPath>
+  </defs>
+  <circle cx="48" cy="48" r="32" fill="#2F7D5B"/>
+  <g clip-path="url(#iconBallClip)">
+    <path d="M14 48 c11 -13 23 -13 34 0 s23 13 34 0 v11 c-11 13 -23 13 -34 0 s-23 -13 -34 0 Z" fill="#E8F6EF"/>
+    <path d="M14 70 c11 -11 23 -11 34 1 s23 12 34 1 v14 H14 Z" fill="#245F46"/>
+  </g>
+  <circle cx="36" cy="32" r="5" fill="#E8F6EF" opacity="0.8"/>
+</svg>
