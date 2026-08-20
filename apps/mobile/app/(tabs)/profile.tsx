@@ -79,7 +79,7 @@ export default function ProfileScreen() {
       <View style={styles.menuSection}>
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push('/(tabs)/orders')}
+          onPress={() => router.push(user ? '/orders' : '/login')}
         >
           <Feather name="package" size={20} color="#374151" />
           <Text style={styles.menuText}>My Orders</Text>

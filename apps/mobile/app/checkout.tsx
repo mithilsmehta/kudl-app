@@ -216,7 +216,7 @@ export default function CheckoutScreen() {
 
         <TouchableOpacity
           style={styles.primaryBtn}
-          onPress={() => router.replace('/(tabs)/orders')}
+          onPress={() => router.replace('/orders')}
         >
           <Text style={styles.primaryBtnText}>View My Orders</Text>
         </TouchableOpacity>

@@ -42,9 +42,17 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Shop',
-          headerTitle: 'KUDL Store',
-          tabBarIcon: ({ color, size }) => <Feather name="shopping-bag" size={size + 2} color={color} />,
+          title: 'Home',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => <Feather name="home" size={size + 2} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="products"
+        options={{
+          title: 'Products',
+          headerTitle: 'All Products',
+          tabBarIcon: ({ color, size }) => <Feather name="grid" size={size + 2} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -62,14 +70,6 @@ export default function TabLayout() {
               )}
             </View>
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: 'Orders',
-          headerTitle: 'My Orders',
-          tabBarIcon: ({ color, size }) => <Feather name="package" size={size + 2} color={color} />,
         }}
       />
       <Tabs.Screen

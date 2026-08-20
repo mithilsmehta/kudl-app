@@ -11,13 +11,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Order, getCustomerOrders } from '../../src/services/api';
-import { useAuth } from '../../src/context/AuthContext';
-import { formatCurrency } from '../../src/utils/currency';
+import { Order, getCustomerOrders } from '../src/services/api';
+import { useAuth } from '../src/context/AuthContext';
+import { formatCurrency } from '../src/utils/currency';
 
 export default function OrdersScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,6 +33,12 @@ export default function OrdersScreen() {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/login');
+    }
+  }, [authLoading, user]);
 
   useEffect(() => {
     loadOrders();
@@ -163,7 +169,7 @@ export default function OrdersScreen() {
             </Text>
             <TouchableOpacity
               style={styles.shopBtn}
-              onPress={() => router.push('/(tabs)')}
+              onPress={() => router.push('/(tabs)/products')}
             >
               <Text style={styles.shopBtnText}>Start Shopping</Text>
             </TouchableOpacity>
