@@ -16,6 +16,7 @@
     "build": "medusa build",
     "start": "medusa start",
     "dev": "medusa develop",
+    "seed": "medusa exec ./src/scripts/seed-kudl-pets.ts",
     "lint": "medusa lint",
     "test:integration:http": "TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
     "test:integration:modules": "TEST_TYPE=integration:modules NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
@@ -32,9 +33,15 @@
     "@medusajs/medusa": "2.19.0",
     "@medusajs/ui": "4.2.1",
     "@tanstack/react-query": "5.64.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "react-i18next": "13.5.0",
     "react-router-dom": "7.18.2",
     "zod": "4.2.0"
+  },
+  "overrides": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
     "@medusajs/test-utils": "2.19.0",
@@ -49,8 +56,10 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.2",
     "vite": "^7.3.6",
+    "xdg-basedir": "^4.0.0",
     "yalc": "^1.0.0-pre.53"
   },
   "engines": {
