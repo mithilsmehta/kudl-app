@@ -4,8 +4,23 @@ import ConstantsRaw from 'expo-constants';
 const AsyncStorage = (AsyncStorageRaw as any)?.default || AsyncStorageRaw;
 const Constants = (ConstantsRaw as any)?.default || ConstantsRaw;
 
-// Helper to determine Mac LAN IP automatically when running in Expo Go
-const getAutoBackendUrl = () => {
+// Resolves the Medusa base URL, in priority order:
+//
+//   1. EXPO_PUBLIC_MEDUSA_BACKEND_URL — an explicit backend, required when pointing at a
+//      shared/deployed instance (Docker on a team host, staging, production). LAN
+//      detection below cannot find a machine that isn't on your Wi-Fi.
+//   2. The Expo dev server's LAN IP — the zero-config path for local development, since
+//      a phone cannot resolve "localhost".
+//   3. localhost — simulator / web fallback.
+//
+// Note: EXPO_PUBLIC_* values are inlined by Metro at bundle time, so restart with
+// `npx expo start -c` after changing .env.
+const getBackendUrl = () => {
+  const explicit = process.env.EXPO_PUBLIC_MEDUSA_BACKEND_URL;
+  if (explicit) {
+    return explicit.replace(/\/+$/, '');
+  }
+
   const hostUri = Constants?.expoConfig?.hostUri || Constants?.manifest?.debuggerHost || Constants?.manifest2?.extra?.expoGo?.debuggerHost;
   if (hostUri) {
     const ip = String(hostUri).split(':')[0];
@@ -16,7 +31,7 @@ const getAutoBackendUrl = () => {
   return 'http://localhost:9000';
 };
 
-export const MEDUSA_BACKEND_URL = getAutoBackendUrl();
+export const MEDUSA_BACKEND_URL = getBackendUrl();
 
 const TOKEN_KEY = '@medusa_auth_token';
 const CART_ID_KEY = '@medusa_cart_id';

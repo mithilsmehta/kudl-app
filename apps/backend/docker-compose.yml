@@ -1,0 +1,81 @@
+# Backend stack: Postgres + Medusa. Run from this directory (apps/backend):
+#
+#   docker compose up -d --build      start everything
+#   docker compose logs -f medusa     watch the backend (prints the publishable key on boot)
+#   docker compose down               stop (database is kept in the named volume)
+#   docker compose down -v            stop AND delete the database
+#
+# Configuration comes from apps/backend/.env — the same file the non-Docker setup uses.
+# Copy .env.template to .env and fill it in before the first run.
+#
+# The mobile app is NOT containerised: Docker has no phone or simulator, and iOS builds
+# require macOS + Xcode. Run it directly with `npx expo start` from apps/mobile.
+
+# Pinned so the project (and therefore the postgres-data volume) keeps a stable name
+# regardless of which directory compose is invoked from. Changing this orphans the
+# database volume.
+name: kudl-demo
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medusa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-medusa-backend}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # Exposed so you can point psql / TablePlus at it from the host.
+    # NOTE: nothing else may hold host port 5432 — stop a native Postgres first
+    # (macOS: brew services stop postgresql@16). Set POSTGRES_PORT to run alongside one.
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medusa} -d ${POSTGRES_DB:-medusa-backend}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  medusa:
+    build:
+      # Build context is the REPO ROOT (two levels up): this is an npm-workspace
+      # monorepo, so the lockfile and hoisted dependencies live there.
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # sslmode matters: Medusa's database driver attempts an SSL handshake by default,
+      # which hangs against this plain Postgres container until the connection pool times
+      # out ("Knex: Timeout acquiring a connection"). "disable" is correct for a container
+      # on a private Docker network. Set DATABASE_SSLMODE=require for a managed Postgres
+      # (RDS, Neon, Supabase) that mandates TLS.
+      DATABASE_URL: postgres://${POSTGRES_USER:-medusa}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-backend}?sslmode=${DATABASE_SSLMODE:-disable}
+
+      # Must be real random values on anything reachable from the internet.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET is required}
+
+      # The image runs with NODE_ENV=production, which makes Medusa mark the admin
+      # session cookie Secure. Browsers drop Secure cookies over plain http://, so the
+      # dashboard would log in and bounce straight back to the login page. Keep "false"
+      # while serving over http; set "true" once the dashboard is behind HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+
+      # Browser origins allowed to call the API. The mobile app is unaffected by
+      # these (React Native is not subject to CORS).
+      STORE_CORS: ${STORE_CORS:-http://localhost:8000}
+      ADMIN_CORS: ${ADMIN_CORS:-http://localhost:9000}
+      AUTH_CORS: ${AUTH_CORS:-http://localhost:9000}
+
+      # The shared team login, created automatically on first boot.
+      MEDUSA_ADMIN_EMAIL: ${MEDUSA_ADMIN_EMAIL:-admin@kudl.com}
+      MEDUSA_ADMIN_PASSWORD: ${MEDUSA_ADMIN_PASSWORD:?MEDUSA_ADMIN_PASSWORD is required}
+    ports:
+      - "${MEDUSA_PORT:-9000}:9000"
+
+volumes:
+  postgres-data:

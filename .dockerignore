@@ -1,0 +1,24 @@
+# Keep the build context small and never ship secrets or host-built artifacts.
+**/node_modules
+**/.medusa
+**/dist
+**/.next
+**/out
+**/.turbo
+**/.expo
+
+# Secrets — the container gets its config from compose environment variables.
+**/.env
+**/.env.*
+!**/.env.template
+!**/.env.example
+
+# The mobile app is not part of the backend image (you cannot run a phone app in a
+# container). It is distributed via Expo/EAS instead.
+apps/mobile
+
+.git
+.gitignore
+**/*.log
+**/.DS_Store
+docker-compose.yml

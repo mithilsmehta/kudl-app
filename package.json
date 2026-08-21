@@ -14,7 +14,14 @@
     "backend:seed": "turbo seed --filter=@dtc/backend",
     "backend:dev": "turbo dev --filter=@dtc/backend",
     "storefront:dev": "turbo dev --filter=@dtc/storefront",
-    "mobile:dev": "npm --prefix apps/mobile start"
+    "mobile:dev": "npm --prefix apps/mobile start",
+    "docker:up": "docker compose -f apps/backend/docker-compose.yml up -d",
+    "docker:build": "docker compose -f apps/backend/docker-compose.yml up -d --build",
+    "docker:down": "docker compose -f apps/backend/docker-compose.yml down",
+    "docker:logs": "docker compose -f apps/backend/docker-compose.yml logs -f medusa",
+    "docker:key": "docker compose -f apps/backend/docker-compose.yml logs medusa | grep 'Publishable API key' | tail -1",
+    "docker:ps": "docker compose -f apps/backend/docker-compose.yml ps",
+    "go": "docker compose -f apps/backend/docker-compose.yml up -d --wait && npm --prefix apps/mobile start -- -c"
   },
   "pnpm": {
     "overrides": {
