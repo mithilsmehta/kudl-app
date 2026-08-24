@@ -1,4 +1,4 @@
-import { loadEnv, defineConfig } from '@medusajs/framework/utils'
+import { loadEnv, defineConfig, Modules } from '@medusajs/framework/utils'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
@@ -39,14 +39,35 @@ const useS3 = Boolean(
   S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
 )
 
+/*
+ * Every entry needs an explicit `key`. Medusa resolves a module's registration name
+ * from its joiner config, and these Redis packages do not expose one — without `key`
+ * defineConfig throws "Module @medusajs/cache-redis doesn't have a serviceName" at
+ * startup, so the process dies before it ever listens on a port.
+ *
+ * Note Modules.WORKFLOW_ENGINE is the string "workflows", not "workflow_engine".
+ *
+ * Package names are the standalone ones: @medusajs/medusa exposes no such subpaths
+ * in 2.19.
+ */
 const redisModules = REDIS_URL
   ? [
-      // Standalone package names — @medusajs/medusa exposes no such subpaths in 2.19.
-      { resolve: '@medusajs/cache-redis', options: { redisUrl: REDIS_URL } },
-      { resolve: '@medusajs/event-bus-redis', options: { redisUrl: REDIS_URL } },
       {
+        key: Modules.CACHE,
+        resolve: '@medusajs/cache-redis',
+        options: { redisUrl: REDIS_URL },
+      },
+      {
+        key: Modules.EVENT_BUS,
+        resolve: '@medusajs/event-bus-redis',
+        options: { redisUrl: REDIS_URL },
+      },
+      {
+        key: Modules.WORKFLOW_ENGINE,
         resolve: '@medusajs/workflow-engine-redis',
-        options: { redis: { url: REDIS_URL } },
+        // `redisUrl`, not `redis: { url }` — the latter still works but the module
+        // logs "The `url` option is deprecated" on every boot.
+        options: { redisUrl: REDIS_URL },
       },
     ]
   : []
@@ -54,6 +75,7 @@ const redisModules = REDIS_URL
 const fileModules = useS3
   ? [
       {
+        key: Modules.FILE,
         resolve: '@medusajs/file',
         options: {
           providers: [

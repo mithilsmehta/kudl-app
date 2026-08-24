@@ -81,6 +81,21 @@ services:
       ADMIN_CORS: ${ADMIN_CORS:-http://localhost:9000}
       AUTH_CORS: ${AUTH_CORS:-http://localhost:8000,http://localhost:9000}
 
+      # Optional locally: with no Redis service in this compose file the variable is
+      # empty, and Medusa falls back to its in-memory event bus, cache and workflow
+      # engine. Set REDIS_URL in .env (and run a Redis container on this network) to
+      # exercise the same wiring a deployed environment uses.
+      REDIS_URL: ${REDIS_URL:-}
+
+      # S3-compatible file storage. All three of bucket/key/secret must be present or
+      # medusa-config.ts leaves the S3 provider off and uses the local ./static path.
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_FILE_URL: ${S3_FILE_URL:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+
       # The shared team login, created automatically on first boot.
       MEDUSA_ADMIN_EMAIL: ${MEDUSA_ADMIN_EMAIL:-admin@kudl.com}
       MEDUSA_ADMIN_PASSWORD: ${MEDUSA_ADMIN_PASSWORD:?MEDUSA_ADMIN_PASSWORD is required}
