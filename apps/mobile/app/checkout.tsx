@@ -15,17 +15,22 @@ import { useCart } from '../src/context/CartContext';
 import { useAuth } from '../src/context/AuthContext';
 import {
   Address,
+  Coupon,
   ShippingOption,
   addShippingMethod,
+  applyCoupon,
   completeCart,
   createCustomerAddress,
+  getCoupons,
   getCustomerAddresses,
   getShippingOptions,
   initiatePaymentSession,
+  removeCoupon,
   updateCartAddress,
   Order,
 } from '../src/services/api';
 import { formatCurrency } from '../src/utils/currency';
+import CouponSheet from '../src/components/CouponSheet';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -58,7 +63,42 @@ export default function CheckoutScreen() {
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [shippingUpdating, setShippingUpdating] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [couponsLoading, setCouponsLoading] = useState(false);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetError, setSheetError] = useState<string | null>(null);
+  // Which code the sheet is working on, so only that row spins.
+  const [busyCode, setBusyCode] = useState<string | null>(null);
+
+  // Totals come from the cart, which the backend recalculates whenever a coupon is
+  // applied or removed — never computed locally, so the displayed price always matches
+  // what will actually be charged.
+  // Only promotions the customer entered count as "the coupon". Medusa also puts
+  // automatic promotions in cart.promotions; treating one of those as the
+  // customer's coupon renders a Remove button that cannot work, because Medusa
+  // re-applies automatic promotions immediately.
+  const customerPromotions = (cart?.promotions ?? []).filter(
+    (p) => p?.code && !p.is_automatic
+  );
+  const autoPromotions = (cart?.promotions ?? []).filter(
+    (p) => p?.code && p.is_automatic
+  );
+  const appliedCoupon = customerPromotions[0]?.code || null;
+  const itemTotal = cart?.item_total ?? cart?.subtotal ?? 0;
+  const shippingTotal = cart?.shipping_total ?? 0;
+  const discountTotal = cart?.discount_total ?? 0;
+  const cartTotal = cart?.total ?? 0;
+  const selectedShippingAmount =
+    shippingOptions.find((o) => o.id === selectedShippingId)?.amount ?? 0;
+  // A shipping-target coupon zeroes shipping_total while an option is still selected.
+  const isFreeDelivery = !!appliedCoupon && shippingTotal === 0 && selectedShippingAmount > 0;
 
   useEffect(() => {
     if (user) {
@@ -89,13 +129,36 @@ export default function CheckoutScreen() {
     }
   };
 
-  const loadShipping = async () => {
+  // Attaches a shipping option to the cart and pulls the recalculated totals.
+  //
+  // This has to happen as soon as a method is picked, not at order placement:
+  // shipping_total lives on the cart, so until a method is actually attached the
+  // summary shows ₹0 delivery and understates the total. Medusa replaces the
+  // existing method rather than appending, so calling this on every change is
+  // safe — the cart never ends up carrying two shipping methods.
+  const chooseShipping = async (optionId: string) => {
+    if (!cart?.id) return;
+    setSelectedShippingId(optionId);
+    setShippingUpdating(true);
+    try {
+      await addShippingMethod(cart.id, optionId);
+      await refreshCart();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not update the shipping method.');
+    } finally {
+      setShippingUpdating(false);
+    }
+  };
+
+  const loadShipping = async (preferredId?: string | null) => {
     if (!cart?.id) return;
     try {
       const options = await getShippingOptions(cart.id);
       setShippingOptions(options);
       if (options.length > 0) {
-        setSelectedShippingId(options[0].id);
+        // Attach the selection too, so the summary is right on arrival rather
+        // than only after the customer taps a row.
+        await chooseShipping(preferredId ?? options[0].id);
       }
     } catch (e) {
       console.log('Error loading shipping options:', e);
@@ -118,7 +181,7 @@ export default function CheckoutScreen() {
       user?.email
     );
     await refreshCart();
-    await loadShipping();
+    await loadShipping(selectedShippingId);
     setStep(2);
   };
 
@@ -163,6 +226,96 @@ export default function CheckoutScreen() {
       Alert.alert('Error', e?.message || 'Failed to save address.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // The shipping method must already be on the cart before a free-delivery coupon can
+  // discount it, so attach the selected option first, then apply the code.
+  const loadCoupons = async (cartId: string) => {
+    setCouponsLoading(true);
+    try {
+      setCoupons(await getCoupons(cartId));
+    } finally {
+      setCouponsLoading(false);
+    }
+  };
+
+  // Shipping is attached first because a free-delivery coupon can only discount
+  // a shipping method that is already on the cart. Throws on failure so callers
+  // can show the reason in the right place.
+  const applyCode = async (code: string) => {
+    if (!cart?.id) return;
+    if (selectedShippingId) {
+      await addShippingMethod(cart.id, selectedShippingId);
+    }
+    await applyCoupon(cart.id, code);
+    await refreshCart();
+    await loadCoupons(cart.id);
+  };
+
+  const removeCode = async (code: string) => {
+    if (!cart?.id) return;
+    await removeCoupon(cart.id, code);
+    await refreshCart();
+    await loadCoupons(cart.id);
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!cart?.id || !couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      await applyCode(couponCode.trim());
+      setCouponCode('');
+    } catch (e: any) {
+      // The backend returns a customer-facing reason (invalid code, minimum not
+      // met, coupon doesn't match the cart's items).
+      setCouponError(e?.message || 'Could not apply this coupon.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = async () => {
+    if (!cart?.id || !appliedCoupon) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      await removeCode(appliedCoupon);
+    } catch (e: any) {
+      setCouponError(e?.message || 'Could not remove this coupon.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const openCouponSheet = async () => {
+    setSheetError(null);
+    setSheetVisible(true);
+    if (cart?.id) await loadCoupons(cart.id);
+  };
+
+  const sheetApply = async (code: string) => {
+    setBusyCode(code);
+    setSheetError(null);
+    try {
+      await applyCode(code);
+    } catch (e: any) {
+      setSheetError(e?.message || 'Could not apply this coupon.');
+    } finally {
+      setBusyCode(null);
+    }
+  };
+
+  const sheetRemove = async (code: string) => {
+    setBusyCode(code);
+    setSheetError(null);
+    try {
+      await removeCode(code);
+    } catch (e: any) {
+      setSheetError(e?.message || 'Could not remove this coupon.');
+    } finally {
+      setBusyCode(null);
     }
   };
 
@@ -368,7 +521,8 @@ export default function CheckoutScreen() {
                 <TouchableOpacity
                   key={opt.id}
                   style={[styles.radioCard, selectedShippingId === opt.id && styles.radioCardSelected]}
-                  onPress={() => setSelectedShippingId(opt.id)}
+                  onPress={() => chooseShipping(opt.id)}
+                  disabled={shippingUpdating}
                 >
                   <View style={styles.radioRow}>
                     <Feather name="truck" size={20} color="#2563eb" />
@@ -404,6 +558,129 @@ export default function CheckoutScreen() {
               </View>
             </View>
 
+            {/* ---- Coupon ---- */}
+            <Text style={[styles.formTitle, { marginTop: 24 }]}>Coupon</Text>
+
+            {appliedCoupon ? (
+              <View style={styles.couponApplied}>
+                <Feather name="check-circle" size={18} color="#059669" />
+                <View style={styles.couponAppliedInfo}>
+                  <Text style={styles.couponAppliedCode}>{appliedCoupon}</Text>
+                  <Text style={styles.couponAppliedSub}>
+                    {discountTotal > 0
+                      ? `You saved ${formatCurrency(discountTotal, cart?.currency_code)}`
+                      : 'Coupon applied'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={handleRemoveCoupon} disabled={couponLoading}>
+                  {couponLoading
+                    ? <ActivityIndicator size="small" color="#6b7280" />
+                    : <Text style={styles.couponRemove}>Remove</Text>}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <View style={styles.couponRow}>
+                  <TextInput
+                    style={[styles.input, styles.couponInput]}
+                    value={couponCode}
+                    onChangeText={(v) => { setCouponCode(v.toUpperCase()); setCouponError(null); }}
+                    placeholder="Enter coupon code"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    editable={!couponLoading}
+                  />
+                  <TouchableOpacity
+                    style={[styles.couponBtn, (!couponCode.trim() || couponLoading) && styles.couponBtnDisabled]}
+                    onPress={handleApplyCoupon}
+                    disabled={!couponCode.trim() || couponLoading}
+                  >
+                    {couponLoading
+                      ? <ActivityIndicator size="small" color="#ffffff" />
+                      : <Text style={styles.couponBtnText}>Apply</Text>}
+                  </TouchableOpacity>
+                </View>
+                {couponError && (
+                  <View style={styles.couponErrorRow}>
+                    <Feather name="alert-circle" size={14} color="#ef4444" />
+                    <Text style={styles.couponErrorText}>{couponError}</Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Entry point into the full coupon list. */}
+            <TouchableOpacity
+              style={styles.viewAllCoupons}
+              onPress={openCouponSheet}
+              activeOpacity={0.85}
+            >
+              <Feather name="tag" size={15} color="#2563eb" />
+              <View style={styles.viewAllTextWrap}>
+                <Text style={styles.viewAllTitle}>View all coupons</Text>
+                <Text style={styles.viewAllSub}>
+                  See every offer you can use on this order
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color="#2563eb" />
+            </TouchableOpacity>
+
+            {/*
+              Automatic promotions are shown for transparency but never with a
+              Remove control — Medusa re-applies them instantly, so a Remove
+              button here would simply appear broken.
+            */}
+            {autoPromotions.length > 0 && (
+              <View style={styles.autoPromoRow}>
+                <Feather name="check-circle" size={14} color="#059669" />
+                <Text style={styles.autoPromoText}>
+                  <Text style={styles.autoPromoCode}>
+                    {autoPromotions.map((p) => p.code).join(', ')}
+                  </Text>{' '}
+                  applied automatically by the store.
+                </Text>
+              </View>
+            )}
+
+            {/* ---- Order summary ---- */}
+            <View style={styles.summaryBox}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Items</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(itemTotal, cart?.currency_code)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Delivery</Text>
+                {shippingUpdating ? (
+                  <ActivityIndicator size="small" color="#9ca3af" />
+                ) : isFreeDelivery ? (
+                  <View style={styles.freeDeliveryRow}>
+                    <Text style={styles.strikethrough}>
+                      {formatCurrency(selectedShippingAmount, cart?.currency_code)}
+                    </Text>
+                    <Text style={styles.freeText}>FREE</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.summaryValue}>
+                    {formatCurrency(shippingTotal, cart?.currency_code)}
+                  </Text>
+                )}
+              </View>
+              {discountTotal > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Discount</Text>
+                  <Text style={styles.discountValue}>
+                    -{formatCurrency(discountTotal, cart?.currency_code)}
+                  </Text>
+                </View>
+              )}
+              <View style={[styles.summaryRow, styles.summaryTotalRow]}>
+                <Text style={styles.summaryTotalLabel}>Total</Text>
+                <Text style={styles.summaryTotalValue}>
+                  {formatCurrency(cartTotal, cart?.currency_code)}
+                </Text>
+              </View>
+            </View>
+
             <TouchableOpacity style={styles.primaryBtn} onPress={handlePlaceOrder} disabled={isLoading}>
               {isLoading ? <ActivityIndicator color="#ffffff" /> : (
                 <Text style={styles.primaryBtnText}>Complete & Place Order</Text>
@@ -416,6 +693,18 @@ export default function CheckoutScreen() {
           </View>
         )}
       </ScrollView>
+
+      <CouponSheet
+        visible={sheetVisible}
+        coupons={coupons}
+        isLoading={couponsLoading}
+        currencyCode={cart?.currency_code}
+        busyCode={busyCode}
+        error={sheetError}
+        onApply={sheetApply}
+        onRemove={sheetRemove}
+        onClose={() => setSheetVisible(false)}
+      />
     </View>
   );
 }
@@ -583,6 +872,180 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  /* Coupon */
+  couponRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  couponInput: {
+    flex: 1,
+    letterSpacing: 1,
+  },
+  couponBtn: {
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    height: 44,
+    paddingHorizontal: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  couponBtnDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  couponBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  couponErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 8,
+  },
+  viewAllCoupons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  viewAllTextWrap: {
+    flex: 1,
+  },
+  viewAllTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  viewAllSub: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: 1,
+  },
+  autoPromoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 12,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  autoPromoText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  autoPromoCode: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  couponErrorText: {
+    flex: 1,
+    fontSize: 12.5,
+    color: '#ef4444',
+    lineHeight: 17,
+  },
+  couponApplied: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 12,
+    padding: 12,
+  },
+  couponAppliedInfo: {
+    flex: 1,
+  },
+  couponAppliedCode: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#065f46',
+    letterSpacing: 1,
+  },
+  couponAppliedSub: {
+    fontSize: 12,
+    color: '#047857',
+    marginTop: 1,
+  },
+  couponRemove: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+
+  /* Order summary */
+  summaryBox: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 14,
+    marginTop: 20,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 13.5,
+    color: '#6b7280',
+  },
+  summaryValue: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  discountValue: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  freeDeliveryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  strikethrough: {
+    fontSize: 13,
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  freeText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  summaryTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 10,
+    marginTop: 2,
+    marginBottom: 0,
+  },
+  summaryTotalLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  summaryTotalValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+
   primaryBtn: {
     backgroundColor: '#2563eb',
     height: 50,

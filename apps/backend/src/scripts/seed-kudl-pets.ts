@@ -1,5 +1,17 @@
+/*
+ * Prices in this file are intentionally in MAJOR units: `amount: 1899` means
+ * ₹1899, not ₹18.99. Medusa v2's pricing module stores and returns decimal major
+ * units (confirmed against the live API: seed 1899 -> calculated_amount 1899 ->
+ * "₹1899.00" via the currency helper in each client app).
+ *
+ * The @medusajs/prices-in-major-units rule assumes any 3-4 digit integer is a
+ * minor-unit mistake, which is wrong for rupee pricing where every realistic
+ * price looks like that. Disabled here with intent — do NOT divide these by 100.
+ */
+/* eslint-disable @medusajs/prices-in-major-units */
 import { MedusaContainer } from "@medusajs/framework"
 import {
+  MedusaError,
   ContainerRegistrationKeys,
   Modules,
   ProductStatus,
@@ -35,7 +47,8 @@ export default async function seed_kudl_pets({
   })
   const defaultSalesChannel = salesChannels[0]
   if (!defaultSalesChannel) {
-    throw new Error(
+    throw new MedusaError(
+      MedusaError.Types.NOT_FOUND,
       "No sales channel found. Run the starter's initial-data-seed first."
     )
   }
@@ -46,7 +59,10 @@ export default async function seed_kudl_pets({
   })
   const store = stores[0]
   if (!store) {
-    throw new Error("No store found. Run the starter's initial-data-seed first.")
+    throw new MedusaError(
+      MedusaError.Types.NOT_FOUND,
+      "No store found. Run the starter's initial-data-seed first."
+    )
   }
 
   const hasInr = store.supported_currencies?.some(

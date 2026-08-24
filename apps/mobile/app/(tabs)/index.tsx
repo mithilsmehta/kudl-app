@@ -24,13 +24,25 @@ const PET_CARD_WIDTH = (width - 44) / 2;
 const FEATURED_CARD_WIDTH = 160;
 
 // Visual treatment per pet category — keyed by the category name from Medusa.
-const PET_THEMES: Record<string, { colors: [string, string]; icon: keyof typeof Feather.glyphMap; tagline: string }> = {
-  Dogs: { colors: ['#2563eb', '#1e40af'], icon: 'github', tagline: 'Food, toys & care' },
-  Cats: { colors: ['#f59e0b', '#d97706'], icon: 'heart', tagline: 'Treats & essentials' },
+// `to` is the colour the card's gradient scrim fades into, so the white label
+// stays readable over any product photo. Mirrors PET_THEMES in the storefront's
+// src/lib/config.ts; keep the two in step.
+const PET_THEMES: Record<string, { to: string; tagline: string }> = {
+  Dogs: { to: '#1e40af', tagline: 'Food, toys & care' },
+  Cats: { to: '#d97706', tagline: 'Treats & essentials' },
+  'Small Pets': { to: '#047857', tagline: 'Birds, fish & more' },
 };
 
+const PET_THEME_FALLBACK = { to: '#4b5563', tagline: 'Explore range' };
+
+// Free delivery is NOT automatic: shipping is a flat ₹99/₹199 and the only free
+// delivery is the KUDLFREE1000 coupon at a ₹1000 subtotal (see the backend's
+// src/lib/coupon-rules.ts). Never advertise a threshold checkout won't honour.
+const FREE_DELIVERY_COUPON = 'KUDLFREE1000';
+const FREE_DELIVERY_MIN_SUBTOTAL = 1000;
+
 const TRUST_BADGES = [
-  { icon: 'truck' as const, label: 'Free Delivery', sub: 'Above ₹499' },
+  { icon: 'truck' as const, label: 'Free Delivery', sub: `Above ₹${FREE_DELIVERY_MIN_SUBTOTAL}` },
   { icon: 'shield' as const, label: '100% Genuine', sub: 'Vet approved' },
   { icon: 'refresh-cw' as const, label: 'Easy Returns', sub: '7 day policy' },
 ];
@@ -160,11 +172,7 @@ export default function HomeScreen() {
 
             <View style={styles.petRow}>
               {categories.map((cat) => {
-                const theme = PET_THEMES[cat.name] || {
-                  colors: ['#6b7280', '#4b5563'] as [string, string],
-                  icon: 'shopping-bag' as const,
-                  tagline: 'Explore range',
-                };
+                const theme = PET_THEMES[cat.name] || PET_THEME_FALLBACK;
                 const image = imageForCategory(cat.id);
                 return (
                   <TouchableOpacity
@@ -179,7 +187,7 @@ export default function HomeScreen() {
                       <View style={[styles.petImage, styles.petImageFallback]} />
                     )}
                     <LinearGradient
-                      colors={['transparent', theme.colors[1]]}
+                      colors={['transparent', theme.to]}
                       style={styles.petOverlay}
                     />
                     <View style={styles.petContent}>
@@ -205,6 +213,15 @@ export default function HomeScreen() {
             </View>
           ))}
         </View>
+
+        {/*
+          Spells out how the free-delivery badge above is actually earned, so the
+          badge is not read as an automatic threshold. Mirrors the storefront.
+        */}
+        <Text style={styles.trustNote}>
+          Free delivery applies with code {FREE_DELIVERY_COUPON} on orders above
+          ₹{FREE_DELIVERY_MIN_SUBTOTAL}, entered at checkout.
+        </Text>
 
         {/* ---- Featured products ---- */}
         <View style={styles.section}>
@@ -441,6 +458,9 @@ const styles = StyleSheet.create({
   /* Shop by pet */
   petRow: {
     flexDirection: 'row',
+    // flexWrap matters: with three or more categories a non-wrapping row pushes
+    // the extra cards off the right edge of the screen instead of onto a new line.
+    flexWrap: 'wrap',
     gap: 12,
   },
   petCard: {
@@ -483,6 +503,14 @@ const styles = StyleSheet.create({
   },
 
   /* Trust */
+  trustNote: {
+    fontSize: 11,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 8,
+    marginHorizontal: 24,
+    lineHeight: 15,
+  },
   trustRow: {
     flexDirection: 'row',
     marginTop: 20,

@@ -1,81 +1,49 @@
-const path = require("path")
-
-const checkEnvVariables = require("./check-env-variables")
-
-checkEnvVariables()
-
 /**
- * Medusa Cloud-related environment variables
+ * Product images come from whatever Medusa serves — the local backend in dev,
+ * an S3/CDN host in production. Remote patterns are declared from env so the
+ * same config works in both without listing hostnames here.
  */
-const S3_HOSTNAME = process.env.MEDUSA_CLOUD_S3_HOSTNAME
-const S3_PATHNAME = process.env.MEDUSA_CLOUD_S3_PATHNAME
+const remotePatterns = []
 
-/**
- * @type {import('next').NextConfig}
- */
-const nextConfig = {
-  reactStrictMode: true,
-  // Monorepo: trace files from the workspace root so standalone/serverless
-  // output on Vercel picks up hoisted dependencies.
-  outputFileTracingRoot: path.join(__dirname, "../../"),
-  logging: {
-    fetches: {
-      fullUrl: true,
-    },
-  },
-  eslint: {
-    // Pre-existing lint debt in the upstream Medusa starter; lint runs via
-    // `npm run lint` rather than blocking deploys.
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    // Type checking is clean — keep it enforced during builds.
-    ignoreBuildErrors: false,
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: "http",
-        hostname: "localhost",
-      },
-      {
-        protocol: "https",
-        hostname: "*.s3.*.amazonaws.com",
-      },
-      {
-        protocol: "https",
-        hostname: "*.s3.amazonaws.com",
-      },
-      {
-        protocol: "https",
-        hostname: "placehold.co",
-      },
-      {
-        // Seeded KUDL Pets product imagery (see apps/backend/src/scripts/seed-kudl-pets.ts)
-        protocol: "https",
-        hostname: "images.unsplash.com",
-      },
-      ...(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
-        ? [
-            {
-              protocol: new URL(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL)
-                .protocol.replace(":", ""),
-              hostname: new URL(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL)
-                .hostname,
-            },
-          ]
-        : []),
-      ...(S3_HOSTNAME && S3_PATHNAME
-        ? [
-            {
-              protocol: "https",
-              hostname: S3_HOSTNAME,
-              pathname: S3_PATHNAME,
-            },
-          ]
-        : []),
-    ],
-  },
+const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+if (backendUrl) {
+  try {
+    const { protocol, hostname, port } = new URL(backendUrl)
+    remotePatterns.push({
+      protocol: protocol.replace(":", ""),
+      hostname,
+      port: port || "",
+      pathname: "/**",
+    })
+  } catch {
+    // A malformed URL shouldn't break the build; images just fall back to <img>.
+  }
 }
 
-module.exports = nextConfig
+if (process.env.MEDUSA_IMAGE_HOSTNAME) {
+  remotePatterns.push({
+    protocol: "https",
+    hostname: process.env.MEDUSA_IMAGE_HOSTNAME,
+    pathname: "/**",
+  })
+}
+
+/*
+ * Hosts the Medusa seed points product thumbnails at. Without these, next/image
+ * refuses the URL and every product renders as a placeholder — so this list has
+ * to track whatever the backend seed actually uses.
+ */
+for (const hostname of ["images.unsplash.com", "placehold.co"]) {
+  remotePatterns.push({ protocol: "https", hostname, pathname: "/**" })
+}
+
+const path = require("path")
+
+/** @type {import('next').NextConfig} */
+module.exports = {
+  reactStrictMode: true,
+  images: { remotePatterns },
+  // Pin the trace root to the monorepo. Without this, Next walks up past the
+  // repo and picks a stray lockfile in the home directory as the workspace root.
+  outputFileTracingRoot: path.join(__dirname, "../.."),
+}

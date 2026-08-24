@@ -1,0 +1,39 @@
+/**
+ * Icon set. The mobile app uses Feather via @expo/vector-icons; lucide-react is
+ * a maintained fork of Feather, so these are the same glyphs. Names mirror the
+ * Feather names used in the app to keep the two codebases easy to diff.
+ */
+export {
+  Home,
+  LayoutGrid as Grid,
+  ShoppingCart,
+  User,
+  Search,
+  ShoppingBag,
+  Heart,
+  ArrowRight,
+  ChevronRight,
+  ChevronLeft,
+  Truck,
+  Shield,
+  RefreshCw,
+  Minus,
+  Plus,
+  Trash2,
+  Check,
+  CheckCircle2 as CheckCircle,
+  XCircle,
+  Clock,
+  Package,
+  MapPin,
+  Settings,
+  LogIn,
+  LogOut,
+  UserPlus,
+  CreditCard,
+  AlertCircle,
+  X,
+  Edit2,
+  Tag,
+  Loader2,
+} from "lucide-react"

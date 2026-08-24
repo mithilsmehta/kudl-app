@@ -1,5 +1,8 @@
 import { MedusaContainer } from "@medusajs/framework"
-import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import {
+  ContainerRegistrationKeys,
+  MedusaError,
+} from "@medusajs/framework/utils"
 import {
   createProductCategoriesWorkflow,
   deleteProductsWorkflow,
@@ -50,7 +53,8 @@ export default async function seed_kudl_merchandising({
   const cats = allCategories.find((c: any) => c.handle === "cats")
 
   if (!dogs || !cats) {
-    throw new Error(
+    throw new MedusaError(
+      MedusaError.Types.NOT_FOUND,
       "Dogs/Cats categories not found. Run seed-kudl-pets.ts first."
     )
   }

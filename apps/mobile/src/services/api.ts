@@ -312,6 +312,17 @@ export interface CartItem {
   variant?: ProductVariant;
 }
 
+export interface CartPromotion {
+  id?: string;
+  code?: string;
+  /**
+   * True for promotions Medusa applies on its own. These are NOT coupons: they
+   * have no code to enter and cannot be removed (Medusa re-adds them
+   * immediately), so the UI must never offer a Remove button for one.
+   */
+  is_automatic?: boolean;
+}
+
 export interface Cart {
   id: string;
   email?: string;
@@ -319,8 +330,12 @@ export interface Cart {
   currency_code?: string;
   items?: CartItem[];
   subtotal?: number;
+  item_total?: number;
+  shipping_total?: number;
+  discount_total?: number;
   total?: number;
   shipping_address?: any;
+  promotions?: CartPromotion[];
 }
 
 export const createCart = async (regionId?: string): Promise<Cart> => {
@@ -336,7 +351,7 @@ export const createCart = async (regionId?: string): Promise<Cart> => {
 
 export const getCart = async (cartId: string): Promise<Cart | null> => {
   try {
-    const data = await apiRequest<{ cart: Cart }>(`/store/carts/${cartId}?fields=*items,*shipping_methods,*region`);
+    const data = await apiRequest<{ cart: Cart }>(`/store/carts/${cartId}?fields=*items,*shipping_methods,*region,*promotions`);
     return data.cart || null;
   } catch (e) {
     return null;
@@ -414,6 +429,55 @@ export const addShippingMethod = async (cartId: string, optionId: string): Promi
       option_id: optionId,
     }),
   });
+  return data.cart;
+};
+
+// Coupons
+//
+// Goes through our custom route rather than Medusa's own POST /store/carts/:id/promotions,
+// because the minimum-order-value condition is enforced there. Medusa's promotion rules
+// cannot express a cart-total minimum, so the backend checks it before applying.
+// A rejected coupon comes back as an error with a customer-facing message.
+export interface Coupon {
+  code: string;
+  /** Short label derived from the promotion, e.g. "Free delivery". */
+  title: string;
+  description: string;
+  /** Minimum pre-discount goods value required, 0 when unrestricted. */
+  min_subtotal: number;
+  eligible: boolean;
+  /** How much more the customer must add to qualify; 0 when eligible. */
+  shortfall: number;
+  applied: boolean;
+}
+
+// Lists the coupons the customer can pick from. Passing the cart id makes the
+// backend compute per-cart eligibility, so the list can show "Add ₹201 more"
+// instead of failing only after the customer taps Apply.
+export const getCoupons = async (cartId?: string): Promise<Coupon[]> => {
+  try {
+    const qs = cartId ? `?cart_id=${encodeURIComponent(cartId)}` : '';
+    const data = await apiRequest<{ coupons: Coupon[] }>(`/store/coupons${qs}`);
+    return data.coupons || [];
+  } catch (e) {
+    console.log('Error fetching coupons:', e);
+    return [];
+  }
+};
+
+export const applyCoupon = async (cartId: string, code: string): Promise<Cart> => {
+  const data = await apiRequest<{ cart: Cart }>(`/store/carts/${cartId}/apply-coupon`, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+  return data.cart;
+};
+
+export const removeCoupon = async (cartId: string, code: string): Promise<Cart> => {
+  const data = await apiRequest<{ cart: Cart }>(
+    `/store/carts/${cartId}/apply-coupon?code=${encodeURIComponent(code)}`,
+    { method: 'DELETE' }
+  );
   return data.cart;
 };
 
