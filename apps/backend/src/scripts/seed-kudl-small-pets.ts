@@ -104,21 +104,23 @@ export default async function seedKudlSmallPets({
   }
 
   /*
-   * Artwork. Unsplash cannot be searched from here, and inventing photo ids
-   * would ship URLs that 404, so these are on-brand generated placeholders.
-   * Uploading a real image in Medusa Admin replaces them — the storefront and app
-   * both read product.thumbnail, so whatever Medusa serves wins automatically.
+   * These products ship WITHOUT images on purpose.
+   *
+   * Real photography isn't available here, and a generated "text on a box"
+   * placeholder looks worse than nothing: the homepage category tile borrows the
+   * first product image in the category as its artwork, so a text placeholder
+   * ends up rendered as the Small Pets tile itself, beside real photos of dogs
+   * and cats.
+   *
+   * With no image, both clients fall back to their own designed empty state (a
+   * grey product-bag icon), which reads as deliberate. Uploading a photo in
+   * Medusa Admin fixes it everywhere at once, since the storefront and the app
+   * both read product.thumbnail and prefer whatever Medusa serves.
    */
-  const placeholder = (label: string) =>
-    `https://placehold.co/1200x1200/eff6ff/2563eb/png?text=${encodeURIComponent(
-      label
-    )}`
 
   type ProductSeed = {
     title: string
     handle: string
-    /** Which small pet this is for — used only for the placeholder label. */
-    pet: string
     description: string
     /** Grams, used by shipping calculations. */
     weight: number
@@ -130,7 +132,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Budgie & Cockatiel Seed Mix",
       handle: "budgie-cockatiel-seed-mix",
-      pet: "Bird",
       description:
         "A balanced daily blend of millet, canary seed and oats for budgies, cockatiels and other small hookbills. Cleaned and dust-extracted so the cage stays tidy.",
       weight: 1000,
@@ -142,7 +143,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Bird Cage Perch & Swing Set",
       handle: "bird-cage-perch-swing-set",
-      pet: "Bird",
       description:
         "Natural hardwood perch with a hanging swing and bell. Gives birds something to climb and chew, which keeps beaks trimmed and boredom down.",
       weight: 400,
@@ -152,7 +152,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Tropical Fish Flakes",
       handle: "tropical-fish-flakes",
-      pet: "Fish",
       description:
         "Everyday flake food for community tropical fish. Floats long enough for surface feeders and sinks slowly for mid-water species, with colour-enhancing carotenoids.",
       weight: 200,
@@ -164,7 +163,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Aquarium Sponge Filter",
       handle: "aquarium-sponge-filter",
-      pet: "Fish",
       description:
         "Air-driven sponge filter for tanks up to 40 litres. Provides gentle biological filtration that will not pull in fry or long-finned fish.",
       weight: 300,
@@ -174,7 +172,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Hamster Wooden Chew Sticks",
       handle: "hamster-wooden-chew-sticks",
-      pet: "Hamster",
       description:
         "Untreated applewood sticks for hamsters, gerbils and mice. Rodent teeth grow continuously, so daily chewing is a need rather than a treat.",
       weight: 150,
@@ -183,7 +180,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Silent Spinner Exercise Wheel",
       handle: "silent-spinner-exercise-wheel",
-      pet: "Hamster",
       description:
         "Ball-bearing exercise wheel with a solid running surface, so no tail or foot can slip through. Quiet enough to leave in a bedroom overnight.",
       weight: 500,
@@ -193,7 +189,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Timothy Hay for Rabbits",
       handle: "timothy-hay-rabbits",
-      pet: "Rabbit",
       description:
         "High-fibre first-cut Timothy hay for rabbits and guinea pigs. Hay should make up the bulk of a rabbit's diet — it keeps the gut moving and wears teeth down evenly.",
       weight: 1000,
@@ -205,7 +200,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Rabbit Grooming Brush",
       handle: "rabbit-grooming-brush",
-      pet: "Rabbit",
       description:
         "Soft-pin brush sized for rabbits and guinea pigs. Regular brushing during a moult reduces the loose fur they would otherwise swallow.",
       weight: 200,
@@ -215,7 +209,6 @@ export default async function seedKudlSmallPets({
     {
       title: "Aspen Bedding for Small Pets",
       handle: "aspen-bedding-small-pets",
-      pet: "Small Pet",
       description:
         "Kiln-dried aspen shavings, absorbent and free of the aromatic oils in pine and cedar that irritate small-animal airways. Suits hamsters, gerbils and rabbits.",
       weight: 2000,
@@ -224,7 +217,6 @@ export default async function seedKudlSmallPets({
     {
       title: "No-Drip Water Bottle",
       handle: "no-drip-water-bottle",
-      pet: "Small Pet",
       description:
         "Cage-mounted water bottle with a stainless steel ball valve that releases water only when licked, so bedding stays dry. Fits wire cages and most hutches.",
       weight: 250,
@@ -252,7 +244,6 @@ export default async function seedKudlSmallPets({
           weight: p.weight,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
-          images: [{ url: placeholder(`${p.pet}\n${p.title}`) }],
           // Declared inline so each product owns an exclusive Pack Size option
           // holding only its own values, matching seed-kudl-pets.ts.
           options: [

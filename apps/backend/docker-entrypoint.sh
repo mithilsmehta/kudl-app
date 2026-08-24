@@ -46,18 +46,36 @@ c.connect()
   .catch(() => { console.log('-1'); process.exit(0); });
 " 2>/dev/null || echo "-1")
 
+# The built image ships compiled .js; the .ts fallback is for a native (non-Docker)
+# run where the sources are present.
+run_seed() {
+  name=$1
+  if [ -f "./src/scripts/$name.js" ]; then
+    npx medusa exec "./src/scripts/$name.js"
+  elif [ -f "./src/scripts/$name.ts" ]; then
+    npx medusa exec "./src/scripts/$name.ts"
+  else
+    log "WARNING: $name not found in the image, skipping."
+  fi
+}
+
 if [ "$PRODUCT_COUNT" = "0" ]; then
   log "Catalogue is empty - seeding KUDL pets data..."
-  if [ -f ./src/scripts/seed-kudl-pets.js ]; then
-    npx medusa exec ./src/scripts/seed-kudl-pets.js
-  elif [ -f ./src/scripts/seed-kudl-pets.ts ]; then
-    npx medusa exec ./src/scripts/seed-kudl-pets.ts
-  else
-    log "WARNING: seed script not found in the image, skipping."
-  fi
+  run_seed seed-kudl-pets
+  # Small Pets is a separate script so it can be applied to an already-seeded
+  # store. On a fresh database it has to run too, or the category the clients
+  # render a tile for simply would not exist.
+  log "Seeding Small Pets range..."
+  run_seed seed-kudl-small-pets
 else
-  log "Catalogue already has $PRODUCT_COUNT products - skipping seed."
+  log "Catalogue already has $PRODUCT_COUNT products - skipping product seed."
 fi
+
+# Promotions are checked independently of products: both clients advertise
+# KUDLFREE1000 in their homepage copy, so a database without it ships a broken
+# promise. The script itself skips codes that already exist.
+log "Ensuring KUDL promotions exist..."
+run_seed seed-kudl-promotions
 
 # ---- 4. Shared admin user ------------------------------------------------------
 # Every environment gets the same login, so the whole team signs in identically.
