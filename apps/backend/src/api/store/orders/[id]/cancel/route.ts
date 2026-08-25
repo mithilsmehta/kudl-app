@@ -1,4 +1,4 @@
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { cancelOrderWorkflow } from "@medusajs/medusa/core-flows"
 
@@ -18,7 +18,7 @@ import { cancelOrderWorkflow } from "@medusajs/medusa/core-flows"
  *
  * What it does NOT do is check who is asking, so that is this route's job.
  */
-export async function POST(req: MedusaRequest, res: MedusaResponse) {
+export async function POST(req: AuthenticatedMedusaRequest, res: MedusaResponse) {
   const orderId = req.params.id
   const customerId = req.auth_context?.actor_id
 
@@ -33,7 +33,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   const { data: orders } = await query.graph({
     entity: "order",
-    fields: ["id", "customer_id", "status", "fulfillment_status", "payment_status"],
+    fields: [
+      "id",
+      "customer_id",
+      "status",
+      "payment_status",
+      // `fulfillment_status` is not exposed on the type query.graph returns, and
+      // reading the fulfillments directly matches what cancelOrderWorkflow actually
+      // checks: an order is dispatched if it has a fulfillment that is not canceled.
+      "fulfillments.id",
+      "fulfillments.canceled_at",
+    ],
     filters: { id: orderId },
   })
 
@@ -61,8 +71,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
    * sense to them, rather than the workflow's internal "all fulfillments must be
    * canceled before canceling an order".
    */
-  const shipped = ["shipped", "partially_shipped", "delivered", "partially_delivered"]
-  if (order.fulfillment_status && shipped.includes(order.fulfillment_status)) {
+  // The generated Fulfillment entries are nullable, so each one is guarded before
+  // its canceled_at is read.
+  const dispatched = (order.fulfillments ?? []).some((f) => !!f && !f.canceled_at)
+  if (dispatched) {
     throw new MedusaError(
       MedusaError.Types.NOT_ALLOWED,
       "This order has already been dispatched and can no longer be cancelled. Please contact support."
@@ -83,7 +95,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   const { data: updated } = await query.graph({
     entity: "order",
-    fields: ["id", "status", "fulfillment_status", "payment_status"],
+    fields: ["id", "status", "payment_status"],
     filters: { id: orderId },
   })
 
