@@ -23,6 +23,7 @@ const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 
 const TOKEN_KEY = "@medusa_auth_token"
 const CART_ID_KEY = "@medusa_cart_id"
+const SESSION_ID_KEY = "@medusa_session_id"
 
 /**
  * localStorage throws in a few real situations — Safari private mode, blocked
@@ -67,8 +68,22 @@ export const setStoredCartId = async (cartId: string | null): Promise<void> => {
   writeStorage(CART_ID_KEY, cartId)
 }
 
+// Anonymous Session ID — identifies a visitor with no customer account to the
+// recommendation engine's event tracking. Generated once and reused for the
+// life of the browser's localStorage, same lifecycle as the cart id.
+export const getOrCreateSessionId = async (): Promise<string> => {
+  const existing = readStorage(SESSION_ID_KEY)
+  if (existing) return existing
+  const generated =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  writeStorage(SESSION_ID_KEY, generated)
+  return generated
+}
+
 // Fetch helper with headers
-async function apiRequest<T>(
+export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -172,6 +187,29 @@ export const getProductById = async (id: string): Promise<Product | null> => {
   } catch (e) {
     console.log(`Error fetching product ${id}:`, e)
     return null
+  }
+}
+
+/**
+ * Fetches multiple products by id in one request, preserving the order of
+ * `ids` (Medusa's `id[]` filter does not guarantee response order). Used by
+ * recommendation UI, which only ever gets product IDs back from the engine
+ * and resolves them against Medusa for display data.
+ */
+export const getProductsByIds = async (ids: string[]): Promise<Product[]> => {
+  if (ids.length === 0) return []
+  try {
+    const regionId = await getDefaultRegionId()
+    const regionParam = regionId ? `&region_id=${regionId}` : ""
+    const idParams = ids.map((id) => `id[]=${encodeURIComponent(id)}`).join("&")
+    const data = await apiRequest<{ products: Product[] }>(
+      `/store/products?${PRODUCT_FIELDS}&${idParams}${regionParam}`
+    )
+    const byId = new Map((data.products || []).map((p) => [p.id, p]))
+    return ids.map((id) => byId.get(id)).filter((p): p is Product => Boolean(p))
+  } catch (e) {
+    console.log("Error fetching products by ids:", e)
+    return []
   }
 }
 
@@ -357,6 +395,7 @@ export interface CartItem {
   unit_price: number
   thumbnail?: string
   variant?: ProductVariant
+  product_id?: string
 }
 
 export interface CartPromotion {

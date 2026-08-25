@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { Search, X, ShoppingBag } from "@/components/icons"
 import { Product, getProducts, getCategories } from "@/lib/api"
+import { trackEvent } from "@/lib/recommendations"
 import ProductCard from "@/components/ProductCard"
 import Spinner from "@/components/Spinner"
 
@@ -71,6 +72,18 @@ function ProductsView() {
       return matchesSearch && matchesCat
     })
   }, [products, searchQuery, selectedCategory])
+
+  // Debounced so a track fires once the visitor pauses typing, not per keystroke.
+  useEffect(() => {
+    const query = searchQuery.trim()
+    if (!query) return
+    const timeout = setTimeout(() => {
+      trackEvent("search_performed", {
+        metadata: { query, result_count: filteredProducts.length },
+      })
+    }, 600)
+    return () => clearTimeout(timeout)
+  }, [searchQuery, filteredProducts.length])
 
   const pills = [{ id: "all", name: "All" }, ...categories]
 

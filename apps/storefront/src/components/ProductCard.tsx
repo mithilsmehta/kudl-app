@@ -37,7 +37,7 @@ export default function ProductCard({ product }: { product: Product }) {
     if (!variantId) return
     setIsAdding(true)
     try {
-      await addToCart(variantId, 1)
+      await addToCart(variantId, 1, product.id)
     } catch (e) {
       console.log("Quick add error:", e)
     } finally {

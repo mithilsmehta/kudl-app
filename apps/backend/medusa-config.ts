@@ -100,7 +100,12 @@ const fileModules = useS3
     ]
   : []
 
-const modules = [...redisModules, ...fileModules]
+// The recommendation engine's own module — activity events, related-products
+// scoring config, etc. Registered unconditionally (unlike the Redis/S3
+// modules above, it has no optional external dependency).
+const customModules = [{ resolve: "./src/modules/recommendation" }]
+
+const modules = [...redisModules, ...fileModules, ...customModules]
 
 module.exports = defineConfig({
   projectConfig: {

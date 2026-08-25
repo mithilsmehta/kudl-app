@@ -36,6 +36,7 @@ import { useCart } from "@/context/CartContext"
 import ProductImage from "@/components/ProductImage"
 import Spinner from "@/components/Spinner"
 import { formatProductPrice } from "@/components/ProductCard"
+import PersonalizedRecommendations from "@/components/recommendations/PersonalizedRecommendations"
 
 const TRUST_BADGES = [
   { Icon: Truck, label: "Free Delivery", sub: FREE_DELIVERY_SUB },
@@ -233,6 +234,9 @@ export default function HomePage() {
           on orders above ₹{FREE_DELIVERY_MIN_SUBTOTAL}. {FREE_DELIVERY_SHORT} is
           entered at checkout.
         </p>
+
+        {/* ---- Personalized recommendations ---- */}
+        <PersonalizedRecommendations />
 
         {/* ---- Featured products ---- */}
         <section className="mt-5 md:mt-10">
