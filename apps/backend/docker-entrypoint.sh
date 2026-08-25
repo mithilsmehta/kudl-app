@@ -82,9 +82,22 @@ run_seed seed-kudl-promotions
 # Fails harmlessly once the user already exists.
 if [ -n "$MEDUSA_ADMIN_EMAIL" ] && [ -n "$MEDUSA_ADMIN_PASSWORD" ]; then
   log "Ensuring admin user $MEDUSA_ADMIN_EMAIL exists..."
-  npx medusa user -e "$MEDUSA_ADMIN_EMAIL" -p "$MEDUSA_ADMIN_PASSWORD" 2>/dev/null \
-    && log "Admin user created." \
-    || log "Admin user already exists - skipping."
+  # `medusa user` only CREATES. It errors on an existing email and never updates the
+  # password, so changing MEDUSA_ADMIN_PASSWORD after first boot has no effect on the
+  # stored credential — the old password keeps working and the new one does not.
+  #
+  # The output is kept (not sent to /dev/null) and the two outcomes are told apart, so
+  # a genuine failure is not reported as the reassuring "already exists".
+  user_output=$(npx medusa user -e "$MEDUSA_ADMIN_EMAIL" -p "$MEDUSA_ADMIN_PASSWORD" 2>&1) || true
+  if echo "$user_output" | grep -qi "created successfully"; then
+    log "Admin user created."
+  elif echo "$user_output" | grep -qiE "already exist|duplicate|unique"; then
+    log "Admin user already exists - password NOT changed."
+    log "  To change it: delete the user, then redeploy. See apps/backend/.env.template."
+  else
+    log "WARNING: could not ensure the admin user. Output was:"
+    echo "$user_output" | tail -5
+  fi
 else
   log "MEDUSA_ADMIN_EMAIL / MEDUSA_ADMIN_PASSWORD not set - no admin user created."
 fi
