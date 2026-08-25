@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { Order, getCustomerOrders } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
 import { formatCurrency } from '../src/utils/currency';
+import { formatOrderReference } from '../src/utils/order-reference';
 
 export default function OrdersScreen() {
   const router = useRouter();
@@ -84,7 +85,7 @@ export default function OrdersScreen() {
         <View style={styles.orderIdRow}>
           <Feather name="package" size={18} color="#2563eb" />
           <Text style={styles.orderIdText}>
-            Order #{item.display_id || item.id.substring(0, 8)}
+            {formatOrderReference(item)}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusDisplay.bg }]}>

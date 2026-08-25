@@ -31,6 +31,7 @@ import {
   Order,
 } from '../src/services/api';
 import { formatCurrency } from '../src/utils/currency';
+import { formatOrderReference } from '../src/utils/order-reference';
 import CouponSheet from '../src/components/CouponSheet';
 import RazorpayCheckout, { RazorpayHandshake } from '../src/components/RazorpayCheckout';
 
@@ -445,7 +446,7 @@ export default function CheckoutScreen() {
         <Feather name="check-circle" size={80} color="#059669" />
         <Text style={styles.successTitle}>Order Placed Successfully!</Text>
         <Text style={styles.successSubtitle}>
-          Order #{placedOrder.display_id || placedOrder.id.substring(0, 8)} has been recorded in Medusa.
+          {formatOrderReference(placedOrder)} has been placed.
         </Text>
         <View style={styles.orderCard}>
           <Text style={styles.orderCardTitle}>Order Summary</Text>

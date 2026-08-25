@@ -18,6 +18,7 @@ import {
 } from "@/components/icons"
 import { Order, getCustomerOrders } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
+import { formatOrderReference } from "@/lib/order-reference"
 import { useRequireAuth } from "@/lib/useRequireAuth"
 import ProductImage from "@/components/ProductImage"
 import ScreenHeader from "@/components/ScreenHeader"
@@ -138,7 +139,7 @@ export default function OrdersPage() {
                       <span className="flex items-center gap-2">
                         <Package className="h-[18px] w-[18px] text-kudl-primary" aria-hidden="true" />
                         <span className="text-[15px] font-bold text-kudl-ink">
-                          Order #{order.display_id || order.id.substring(0, 8)}
+                          {formatOrderReference(order)}
                         </span>
                       </span>
                       <span

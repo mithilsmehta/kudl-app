@@ -11,6 +11,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Order, getOrderById } from '../../src/services/api';
 import { formatCurrency } from '../../src/utils/currency';
+import { formatOrderReference } from '../../src/utils/order-reference';
 
 const STEPS = [
   { key: 'placed', label: 'Order Placed', icon: 'shopping-bag' as const },
@@ -76,7 +77,7 @@ export default function OrderDetailScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerCard}>
-        <Text style={styles.orderIdText}>Order #{order.display_id || order.id.substring(0, 8)}</Text>
+        <Text style={styles.orderIdText}>{formatOrderReference(order)}</Text>
         <Text style={styles.dateText}>Placed on {formatDate(order.created_at)}</Text>
       </View>
 

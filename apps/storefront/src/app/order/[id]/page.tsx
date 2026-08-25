@@ -18,6 +18,7 @@ import {
 } from "@/components/icons"
 import { Order, getOrderById } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
+import { formatOrderReference } from "@/lib/order-reference"
 import { useRequireAuth } from "@/lib/useRequireAuth"
 import ProductImage from "@/components/ProductImage"
 import ScreenHeader from "@/components/ScreenHeader"
@@ -101,7 +102,7 @@ export default function OrderDetailPage() {
       <div className="mx-auto max-w-3xl p-4 md:px-6 md:pb-16">
         <div className="mb-4">
           <p className="text-xl font-bold text-kudl-ink">
-            Order #{order.display_id || order.id.substring(0, 8)}
+            {formatOrderReference(order)}
           </p>
           <p className="mt-0.5 text-[13px] text-kudl-muted">
             Placed on {formatDate(order.created_at)}

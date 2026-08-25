@@ -49,6 +49,7 @@ import {
   updateCartAddress,
 } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
+import { formatOrderReference } from "@/lib/order-reference"
 import { openRazorpayCheckout, type RazorpayHandshake } from "@/lib/razorpay"
 import { useCart } from "@/context/CartContext"
 import { useRequireAuth } from "@/lib/useRequireAuth"
@@ -475,7 +476,7 @@ export default function CheckoutPage() {
           Order Placed Successfully!
         </h1>
         <p className="mt-2 text-sm text-kudl-muted">
-          Order #{placedOrder.display_id || placedOrder.id.substring(0, 8)} has
+          {formatOrderReference(placedOrder)} has
           been recorded.
         </p>
 
