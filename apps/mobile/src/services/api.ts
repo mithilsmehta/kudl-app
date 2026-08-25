@@ -566,6 +566,20 @@ export const getCustomerOrders = async (): Promise<Order[]> => {
   }
 };
 
+// Cancels the customer's own order.
+//
+// Cancels rather than deletes: an order is the record of a payment, so Medusa has no
+// delete-order API and destroying one would break GST, refund and chargeback trails.
+// The backend refunds any captured payment as part of cancelling.
+//
+// Throws with the backend's customer-facing reason so the caller can show it directly.
+export const cancelOrder = async (id: string): Promise<Order | null> => {
+  const data = await apiRequest<{ order: Order }>(`/store/orders/${id}/cancel`, {
+    method: 'POST',
+  });
+  return data.order || null;
+};
+
 export const getOrderById = async (id: string): Promise<Order | null> => {
   try {
     const data = await apiRequest<{ order: Order }>(`/store/orders/${id}`);

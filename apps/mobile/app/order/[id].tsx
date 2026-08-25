@@ -6,10 +6,12 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { Order, getOrderById } from '../../src/services/api';
+import { Order, cancelOrder, getOrderById } from '../../src/services/api';
 import { formatCurrency } from '../../src/utils/currency';
 import { formatOrderReference } from '../../src/utils/order-reference';
 
@@ -33,6 +35,7 @@ export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -52,6 +55,45 @@ export default function OrderDetailScreen() {
       hour: 'numeric',
       minute: '2-digit',
     });
+  };
+
+  // Cancellation is only offered before dispatch; the backend refuses it afterwards,
+  // so showing the button then would only produce an error.
+  const DISPATCHED = ['shipped', 'partially_shipped', 'delivered', 'partially_delivered'];
+  const canCancel =
+    !!order &&
+    order.status !== 'canceled' &&
+    !DISPATCHED.includes(order.fulfillment_status ?? 'not_fulfilled');
+
+  const confirmCancel = () => {
+    if (!order) return;
+    const paid = order.payment_status === 'captured';
+    Alert.alert(
+      'Cancel this order?',
+      paid
+        ? 'The order will be cancelled and the amount refunded to your original payment method. This cannot be undone.'
+        : 'The order will be cancelled. This cannot be undone.',
+      [
+        { text: 'Keep order', style: 'cancel' },
+        {
+          text: 'Cancel order',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelling(true);
+            try {
+              const updated = await cancelOrder(order.id);
+              // Re-read rather than trusting the local copy, so payment_status
+              // reflects the refund.
+              setOrder(updated ?? (await getOrderById(order.id)));
+            } catch (e: any) {
+              Alert.alert('Could not cancel', e?.message || 'This order could not be cancelled.');
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading) {
@@ -164,6 +206,26 @@ export default function OrderDetailScreen() {
           <Text style={styles.totalValue}>{formatCurrency(order.total, order.currency_code)}</Text>
         </View>
       </View>
+
+      {canCancel && (
+        <View>
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={confirmCancel}
+            disabled={cancelling}
+          >
+            {cancelling ? (
+              <ActivityIndicator size="small" color="#ef4444" />
+            ) : (
+              <Text style={styles.cancelBtnText}>Cancel this order</Text>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.cancelNote}>
+            Available until the order is dispatched. Anything already paid is
+            refunded to your original payment method.
+          </Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -341,6 +403,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
+  },
+  cancelBtn: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ef4444',
+  },
+  cancelNote: {
+    fontSize: 11,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 8,
+    marginHorizontal: 16,
+    lineHeight: 15,
   },
   totalRow: {
     borderTopWidth: 1,

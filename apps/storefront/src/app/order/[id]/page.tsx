@@ -16,12 +16,14 @@ import {
   AlertCircle,
   Package,
 } from "@/components/icons"
-import { Order, getOrderById } from "@/lib/api"
+import { Order, cancelOrder, getOrderById } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
 import { formatOrderReference } from "@/lib/order-reference"
 import { useRequireAuth } from "@/lib/useRequireAuth"
 import ProductImage from "@/components/ProductImage"
 import ScreenHeader from "@/components/ScreenHeader"
+import ConfirmDialog from "@/components/ConfirmDialog"
+import ErrorBanner from "@/components/ErrorBanner"
 import Spinner from "@/components/Spinner"
 
 const STEPS = [
@@ -58,6 +60,9 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id || !isReady) return
@@ -71,6 +76,37 @@ export default function OrderDetailPage() {
       cancelled = true
     }
   }, [id, isReady])
+
+  /*
+   * Cancellation is only offered before dispatch. Once the order is shipped the
+   * backend refuses it, so showing the button then would just produce an error.
+   */
+  const DISPATCHED = [
+    "shipped",
+    "partially_shipped",
+    "delivered",
+    "partially_delivered",
+  ]
+  const canCancel =
+    !!order &&
+    order.status !== "canceled" &&
+    !DISPATCHED.includes(order.fulfillment_status ?? "not_fulfilled")
+
+  const handleCancel = async () => {
+    if (!order) return
+    setConfirmCancel(false)
+    setCancelling(true)
+    setCancelError(null)
+    try {
+      const updated = await cancelOrder(order.id)
+      // Re-read rather than trusting the local copy, so payment_status reflects the refund.
+      setOrder(updated ?? (await getOrderById(order.id)))
+    } catch (e: any) {
+      setCancelError(e?.message || "This order could not be cancelled.")
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   if (!isReady || isLoading) {
     return (
@@ -242,7 +278,45 @@ export default function OrderDetailPage() {
             </span>
           </div>
         </section>
+
+        <ErrorBanner message={cancelError} />
+
+        {canCancel && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setConfirmCancel(true)}
+              disabled={cancelling}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 text-[15px] font-semibold text-kudl-danger disabled:opacity-60"
+            >
+              {cancelling ? (
+                <Spinner className="h-5 w-5 text-kudl-danger" label="Cancelling order" />
+              ) : (
+                "Cancel this order"
+              )}
+            </button>
+            <p className="mt-2 text-center text-[11px] text-kudl-faint">
+              Available until the order is dispatched. Anything already paid is
+              refunded to your original payment method.
+            </p>
+          </div>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={confirmCancel}
+        title="Cancel this order?"
+        message={
+          order.payment_status === "captured"
+            ? "The order will be cancelled and the amount refunded to your original payment method. This cannot be undone."
+            : "The order will be cancelled. This cannot be undone."
+        }
+        confirmLabel="Cancel order"
+        cancelLabel="Keep order"
+        destructive
+        onConfirm={handleCancel}
+        onCancel={() => setConfirmCancel(false)}
+      />
     </div>
   )
 }
