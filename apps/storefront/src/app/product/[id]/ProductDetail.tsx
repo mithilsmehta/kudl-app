@@ -23,6 +23,9 @@ import ProductImage from "@/components/ProductImage"
 import ScreenHeader from "@/components/ScreenHeader"
 import Spinner from "@/components/Spinner"
 import ErrorBanner from "@/components/ErrorBanner"
+import ProductRecommendations from "@/components/recommendations/ProductRecommendations"
+import FrequentlyBoughtTogether from "@/components/recommendations/FrequentlyBoughtTogether"
+import { trackEvent } from "@/lib/recommendations"
 
 export default function ProductDetail({ id }: { id: string }) {
   const { addToCart } = useCart()
@@ -49,6 +52,9 @@ export default function ProductDetail({ id }: { id: string }) {
         if (data?.variants && data.variants.length > 0) {
           setSelectedVariant(data.variants[0])
         }
+        if (data) {
+          trackEvent("product_viewed", { productId: data.id })
+        }
       } catch (e) {
         console.log("Error loading product detail:", e)
       } finally {
@@ -62,11 +68,11 @@ export default function ProductDetail({ id }: { id: string }) {
   }, [id])
 
   const handleAddToCart = async () => {
-    if (!selectedVariant) return
+    if (!selectedVariant || !product) return
     setIsAdding(true)
     setError(null)
     try {
-      await addToCart(selectedVariant.id, quantity)
+      await addToCart(selectedVariant.id, quantity, product.id)
       setAddedSuccess(true)
       setTimeout(() => setAddedSuccess(false), 2000)
     } catch (e: any) {
@@ -300,6 +306,11 @@ export default function ProductDetail({ id }: { id: string }) {
             <div className="mt-7 hidden md:block">{addToCartButton}</div>
           </div>
         </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl md:px-6">
+        <FrequentlyBoughtTogether productId={product.id} />
+        <ProductRecommendations productId={product.id} />
       </div>
 
       {/* Mobile pinned footer — sits above the tab bar */}

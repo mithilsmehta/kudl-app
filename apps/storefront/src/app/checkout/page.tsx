@@ -49,8 +49,12 @@ import {
   updateCartAddress,
 } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
+<<<<<<< HEAD
 import { formatOrderReference } from "@/lib/order-reference"
 import { openRazorpayCheckout, type RazorpayHandshake } from "@/lib/razorpay"
+=======
+import { trackEvent } from "@/lib/recommendations"
+>>>>>>> dev
 import { useCart } from "@/context/CartContext"
 import { useRequireAuth } from "@/lib/useRequireAuth"
 import AddressForm, {
@@ -438,6 +442,11 @@ export default function CheckoutPage() {
       const res = await completeCart(cart.id)
       if (res.type === "order" && res.order) {
         setPlacedOrder(res.order)
+        res.order.items?.forEach((item) => {
+          if (item.product_id) {
+            trackEvent("product_purchased", { productId: item.product_id })
+          }
+        })
         await resetCart()
         setStep(3)
       } else {

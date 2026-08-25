@@ -14,12 +14,17 @@ import {
   setStoredCartId,
   updateCartItem,
 } from "@/lib/api"
+import { trackEvent } from "@/lib/recommendations"
 
 interface CartContextType {
   cart: Cart | null
   itemCount: number
   isLoading: boolean
-  addToCart: (variantId: string, quantity?: number) => Promise<void>
+  addToCart: (
+    variantId: string,
+    quantity?: number,
+    productId?: string
+  ) => Promise<void>
   updateQuantity: (lineItemId: string, quantity: number) => Promise<void>
   removeItem: (lineItemId: string) => Promise<void>
   refreshCart: () => Promise<void>
@@ -77,7 +82,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }
 
-  const addToCart = async (variantId: string, quantity: number = 1) => {
+  const addToCart = async (
+    variantId: string,
+    quantity: number = 1,
+    productId?: string
+  ) => {
     setIsLoading(true)
     try {
       let activeCart = cart
@@ -86,6 +95,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       const updated = await apiAddToCart(activeCart.id, variantId, quantity)
       setCart(updated)
+      if (productId) {
+        trackEvent("product_added_to_cart", { productId })
+      }
     } catch (e) {
       console.log("Error adding to cart:", e)
       throw e

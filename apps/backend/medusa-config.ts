@@ -100,6 +100,7 @@ const fileModules = useS3
     ]
   : []
 
+<<<<<<< HEAD
 /*
  * Razorpay. Registered only when credentials are present, so a developer without
  * them still gets a bootable backend with Medusa's default provider.
@@ -136,6 +137,14 @@ const paymentModules = useRazorpay
   : []
 
 const modules = [...redisModules, ...fileModules, ...paymentModules]
+=======
+// The recommendation engine's own module — activity events, related-products
+// scoring config, etc. Registered unconditionally (unlike the Redis/S3
+// modules above, it has no optional external dependency).
+const customModules = [{ resolve: "./src/modules/recommendation" }]
+
+const modules = [...redisModules, ...fileModules, ...customModules]
+>>>>>>> dev
 
 module.exports = defineConfig({
   projectConfig: {
