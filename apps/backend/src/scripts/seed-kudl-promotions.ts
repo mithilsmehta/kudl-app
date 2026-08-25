@@ -45,17 +45,6 @@ export default async function seedKudlPromotions({
         currency_code: "inr",
       },
     },
-    {
-      code: "SAVE10",
-      summary: "10% off the order total, no minimum.",
-      application_method: {
-        type: "percentage",
-        target_type: "order",
-        allocation: "across",
-        value: 10,
-        currency_code: "inr",
-      },
-    },
   ]
 
   logger.info("Seeding KUDL promotions...")

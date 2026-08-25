@@ -67,15 +67,23 @@ if [ "$PRODUCT_COUNT" = "0" ]; then
   # render a tile for simply would not exist.
   log "Seeding Small Pets range..."
   run_seed seed-kudl-small-pets
+  # Only on a fresh catalogue: both clients advertise KUDLFREE1000 in their homepage
+  # copy, so a brand-new store needs it to exist or it ships a broken promise.
+  log "Seeding KUDL promotions..."
+  run_seed seed-kudl-promotions
 else
   log "Catalogue already has $PRODUCT_COUNT products - skipping product seed."
 fi
 
-# Promotions are checked independently of products: both clients advertise
-# KUDLFREE1000 in their homepage copy, so a database without it ships a broken
-# promise. The script itself skips codes that already exist.
-log "Ensuring KUDL promotions exist..."
-run_seed seed-kudl-promotions
+# NOTE: the promotions seed deliberately does NOT run here.
+#
+# It used to run on every boot, which meant a coupon deleted in the dashboard came
+# straight back on the next deploy — the seed cannot tell "never existed" from
+# "deliberately removed". Promotions are now seeded only alongside a fresh catalogue
+# (see the PRODUCT_COUNT branch above), so deleting one in Medusa Admin sticks.
+#
+# To add promotions to an existing store, run it explicitly:
+#   npx medusa exec ./src/scripts/seed-kudl-promotions.js
 
 # ---- 4. Shared admin user ------------------------------------------------------
 # Every environment gets the same login, so the whole team signs in identically.
