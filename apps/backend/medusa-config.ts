@@ -1,6 +1,6 @@
-import { loadEnv, defineConfig, Modules } from '@medusajs/framework/utils'
+import { loadEnv, defineConfig, Modules } from '@medusajs/framework/utils';
 
-loadEnv(process.env.NODE_ENV || 'development', process.cwd())
+loadEnv(process.env.NODE_ENV || 'development', process.cwd());
 
 // With NODE_ENV=production (as in the Docker image) Medusa marks the admin session
 // cookie Secure + SameSite=lax. Browsers refuse to store a Secure cookie sent over
@@ -10,7 +10,7 @@ loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 // Set COOKIE_SECURE=false when the dashboard is served over http:// (local Docker, a
 // LAN host). Leave it UNSET anywhere served over https:// — including Railway — so
 // the cookie stays Secure.
-const insecureCookies = process.env.COOKIE_SECURE === 'false'
+const insecureCookies = process.env.COOKIE_SECURE === 'false';
 
 /**
  * Redis. Without it Medusa falls back to an in-memory event bus, cache and workflow
@@ -21,7 +21,7 @@ const insecureCookies = process.env.COOKIE_SECURE === 'false'
  *
  * Left optional so local `docker compose` (no Redis service) still boots.
  */
-const REDIS_URL = process.env.REDIS_URL
+const REDIS_URL = process.env.REDIS_URL;
 
 /**
  * File storage. Medusa's default provider writes to ./static on the container's own
@@ -34,10 +34,8 @@ const REDIS_URL = process.env.REDIS_URL
  *   - Local provider on a mounted disk (e.g. a Railway Volume at /app/static): leave
  *     the S3_* vars unset. Single replica only.
  */
-const S3_BUCKET = process.env.S3_BUCKET
-const useS3 = Boolean(
-  S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
-)
+const S3_BUCKET = process.env.S3_BUCKET;
+const useS3 = Boolean(S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY);
 
 /*
  * Every entry needs an explicit `key`. Medusa resolves a module's registration name
@@ -70,7 +68,7 @@ const redisModules = REDIS_URL
         options: { redisUrl: REDIS_URL },
       },
     ]
-  : []
+  : [];
 
 const fileModules = useS3
   ? [
@@ -89,18 +87,15 @@ const fileModules = useS3
                 region: process.env.S3_REGION,
                 bucket: S3_BUCKET,
                 // Required for Cloudflare R2 and other non-AWS S3 endpoints.
-                ...(process.env.S3_ENDPOINT
-                  ? { endpoint: process.env.S3_ENDPOINT }
-                  : {}),
+                ...(process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT } : {}),
               },
             },
           ],
         },
       },
     ]
-  : []
+  : [];
 
-<<<<<<< HEAD
 /*
  * Razorpay. Registered only when credentials are present, so a developer without
  * them still gets a bootable backend with Medusa's default provider.
@@ -108,9 +103,9 @@ const fileModules = useS3
  * Test and live are the same code path — Razorpay distinguishes them purely by which
  * key pair you supply, so there is no mode flag here and none is wanted.
  */
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET
-const useRazorpay = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET)
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+const useRazorpay = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
 
 const paymentModules = useRazorpay
   ? [
@@ -134,25 +129,20 @@ const paymentModules = useRazorpay
         },
       },
     ]
-  : []
+  : [];
 
-const modules = [...redisModules, ...fileModules, ...paymentModules]
-=======
 // The recommendation engine's own module — activity events, related-products
 // scoring config, etc. Registered unconditionally (unlike the Redis/S3
 // modules above, it has no optional external dependency).
-const customModules = [{ resolve: "./src/modules/recommendation" }]
+const customModules = [{ resolve: './src/modules/recommendation' }];
 
-const modules = [...redisModules, ...fileModules, ...customModules]
->>>>>>> dev
+const modules = [...redisModules, ...fileModules, ...paymentModules, ...customModules];
 
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     ...(REDIS_URL ? { redisUrl: REDIS_URL } : {}),
-    ...(insecureCookies
-      ? { cookieOptions: { secure: false, sameSite: 'lax' as const } }
-      : {}),
+    ...(insecureCookies ? { cookieOptions: { secure: false, sameSite: 'lax' as const } } : {}),
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
@@ -163,4 +153,4 @@ module.exports = defineConfig({
   },
   // Only declared when configured, so the defaults stay in place locally.
   ...(modules.length ? { modules } : {}),
-})
+});
