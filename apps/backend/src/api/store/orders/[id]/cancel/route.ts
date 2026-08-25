@@ -93,9 +93,25 @@ export async function POST(req: AuthenticatedMedusaRequest, res: MedusaResponse)
     )
   }
 
+  /*
+   * Return a complete order, not just the changed fields. Callers render this
+   * directly, and a partial order without `total` or `currency_code` crashed the
+   * order page's currency formatter on undefined.
+   */
   const { data: updated } = await query.graph({
     entity: "order",
-    fields: ["id", "status", "payment_status"],
+    fields: [
+      "id",
+      "display_id",
+      "status",
+      "payment_status",
+      "currency_code",
+      "total",
+      "subtotal",
+      "shipping_total",
+      "discount_total",
+      "created_at",
+    ],
     filters: { id: orderId },
   })
 

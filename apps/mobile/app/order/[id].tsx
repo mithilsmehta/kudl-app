@@ -81,10 +81,12 @@ export default function OrderDetailScreen() {
           onPress: async () => {
             setCancelling(true);
             try {
-              const updated = await cancelOrder(order.id);
-              // Re-read rather than trusting the local copy, so payment_status
-              // reflects the refund.
-              setOrder(updated ?? (await getOrderById(order.id)));
+              await cancelOrder(order.id);
+              // Re-read through the normal order endpoint rather than rendering the
+              // cancel response, which is a mutation result and not the full order
+              // shape this screen needs.
+              const fresh = await getOrderById(order.id);
+              if (fresh) setOrder(fresh);
             } catch (e: any) {
               Alert.alert('Could not cancel', e?.message || 'This order could not be cancelled.');
             } finally {

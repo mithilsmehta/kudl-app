@@ -98,9 +98,14 @@ export default function OrderDetailPage() {
     setCancelling(true)
     setCancelError(null)
     try {
-      const updated = await cancelOrder(order.id)
-      // Re-read rather than trusting the local copy, so payment_status reflects the refund.
-      setOrder(updated ?? (await getOrderById(order.id)))
+      await cancelOrder(order.id)
+      /*
+       * Re-read through the normal order endpoint rather than rendering the cancel
+       * response. That response is a mutation result, not the full order shape the
+       * page needs, and rendering it directly is what caused the blank page.
+       */
+      const fresh = await getOrderById(order.id)
+      if (fresh) setOrder(fresh)
     } catch (e: any) {
       setCancelError(e?.message || "This order could not be cancelled.")
     } finally {
