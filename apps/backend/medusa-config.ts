@@ -100,7 +100,42 @@ const fileModules = useS3
     ]
   : []
 
-const modules = [...redisModules, ...fileModules]
+/*
+ * Razorpay. Registered only when credentials are present, so a developer without
+ * them still gets a bootable backend with Medusa's default provider.
+ *
+ * Test and live are the same code path — Razorpay distinguishes them purely by which
+ * key pair you supply, so there is no mode flag here and none is wanted.
+ */
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET
+const useRazorpay = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET)
+
+const paymentModules = useRazorpay
+  ? [
+      {
+        key: Modules.PAYMENT,
+        resolve: '@medusajs/payment',
+        options: {
+          providers: [
+            {
+              // Path is relative to the built server bundle, which is why it points at
+              // ./src rather than a package name.
+              resolve: './src/modules/razorpay',
+              id: 'razorpay',
+              options: {
+                keyId: RAZORPAY_KEY_ID,
+                keySecret: RAZORPAY_KEY_SECRET,
+                webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+              },
+            },
+          ],
+        },
+      },
+    ]
+  : []
+
+const modules = [...redisModules, ...fileModules, ...paymentModules]
 
 module.exports = defineConfig({
   projectConfig: {

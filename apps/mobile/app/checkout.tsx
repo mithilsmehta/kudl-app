@@ -23,6 +23,7 @@ import {
   createCustomerAddress,
   getCoupons,
   getCustomerAddresses,
+  getPaymentProviders,
   getShippingOptions,
   initiatePaymentSession,
   removeCoupon,
@@ -31,6 +32,7 @@ import {
 } from '../src/services/api';
 import { formatCurrency } from '../src/utils/currency';
 import CouponSheet from '../src/components/CouponSheet';
+import RazorpayCheckout, { RazorpayHandshake } from '../src/components/RazorpayCheckout';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -70,6 +72,19 @@ export default function CheckoutScreen() {
   const [couponCode, setCouponCode] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  // Payment providers come from the backend, so the Razorpay id is never hardcoded
+  // and the option disappears if the backend has no credentials configured.
+  const [providers, setProviders] = useState<string[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  // Razorpay Checkout state. `pending` holds what the WebView needs to open.
+  const [rzpSession, setRzpSession] = useState<{
+    keyId: string;
+    orderId: string;
+    amountInPaise: number;
+    currency: string;
+    sessionData: Record<string, unknown>;
+  } | null>(null);
+
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [couponsLoading, setCouponsLoading] = useState(false);
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -111,6 +126,24 @@ export default function CheckoutScreen() {
       loadShipping();
     }
   }, [cart?.id]);
+
+  useEffect(() => {
+    const regionId = cart?.region_id;
+    if (!regionId) return;
+    let cancelled = false;
+    getPaymentProviders(regionId).then((list) => {
+      if (cancelled) return;
+      const ids = list.filter((p) => p.is_enabled !== false).map((p) => p.id);
+      setProviders(ids);
+      // Prefer Razorpay when offered, else whatever the store has (manual by default).
+      setSelectedProvider(
+        (current) => current ?? ids.find((id) => id.includes('razorpay')) ?? ids[0] ?? null
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cart?.region_id]);
 
   const loadAddresses = async () => {
     setLoadingAddresses(true);
@@ -319,6 +352,27 @@ export default function CheckoutScreen() {
     }
   };
 
+  // Completes the cart and shows the confirmation. Shared by the direct path and the
+  // Razorpay path so there is one definition of "the order was placed".
+  const finalizeOrder = async (cartId: string) => {
+    const res = await completeCart(cartId);
+    if (res.type === 'order' && res.order) {
+      setPlacedOrder(res.order);
+      await resetCart();
+      setStep(3);
+      return;
+    }
+    /*
+     * Medusa returns type "cart" when completion was REJECTED — the cart is still
+     * live and no order exists. Inventing a placeholder order here would show the
+     * customer a confirmation, and an order number, for something that was never
+     * placed. Report the failure and leave the cart intact so they can retry.
+     */
+    throw new Error(
+      "We couldn't complete your order. Your cart is unchanged — please check your details and try again."
+    );
+  };
+
   const handlePlaceOrder = async () => {
     if (!cart?.id) return;
     setIsLoading(true);
@@ -326,28 +380,60 @@ export default function CheckoutScreen() {
       if (selectedShippingId) {
         await addShippingMethod(cart.id, selectedShippingId);
       }
-      await initiatePaymentSession(cart.id);
-      const res = await completeCart(cart.id);
-      if (res.type === 'order' && res.order) {
-        setPlacedOrder(res.order);
-        await resetCart();
-        setStep(3);
-      } else {
-        const fallbackOrder: Order = {
-          id: `order_${Date.now()}`,
-          display_id: Math.floor(1000 + Math.random() * 9000),
-          status: 'completed',
-          total: cart.subtotal || 0,
-          currency_code: cart.currency_code || 'inr',
-          items: cart.items || [],
-          created_at: new Date().toISOString(),
-        };
-        setPlacedOrder(fallbackOrder);
-        await resetCart();
-        setStep(3);
+
+      const providerId = selectedProvider ?? 'pp_system_default';
+      const session = await initiatePaymentSession(cart.id, providerId);
+
+      /*
+       * Razorpay needs the customer to authorise the payment in Razorpay's own
+       * Checkout before the cart can be completed, so the flow pauses here and
+       * resumes in handleRazorpaySuccess. The order id and public key both come from
+       * the session the backend created — nothing about the payment is computed here.
+       */
+      if (providerId.includes('razorpay')) {
+        const data = (session?.data ?? {}) as Record<string, any>;
+        if (!data.razorpay_order_id || !data.key_id) {
+          throw new Error('Payment could not be started. Please try again in a moment.');
+        }
+        setRzpSession({
+          keyId: String(data.key_id),
+          orderId: String(data.razorpay_order_id),
+          amountInPaise: Number(data.amount_in_paise ?? 0),
+          currency: String(data.currency ?? 'INR'),
+          sessionData: data,
+        });
+        // Keep the button disabled while Checkout is on screen.
+        return;
       }
+
+      await finalizeOrder(cart.id);
     } catch (e: any) {
       Alert.alert('Order Failed', e?.message || 'Could not complete order.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Razorpay returned a signed result. Hand it to the backend for verification, then
+  // complete the cart. The signature is never trusted on the device.
+  const handleRazorpaySuccess = async (handshake: RazorpayHandshake) => {
+    if (!cart?.id || !rzpSession) return;
+    const providerId = selectedProvider ?? 'pp_system_default';
+    setRzpSession(null);
+    setIsLoading(true);
+    try {
+      await initiatePaymentSession(cart.id, providerId, {
+        ...rzpSession.sessionData,
+        razorpay_payment_id: handshake.razorpay_payment_id,
+        razorpay_signature: handshake.razorpay_signature,
+      });
+      await finalizeOrder(cart.id);
+    } catch (e: any) {
+      Alert.alert(
+        'Payment Received',
+        e?.message ||
+          'Your payment went through but the order could not be completed. Please contact support before paying again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -548,15 +634,45 @@ export default function CheckoutScreen() {
             )}
 
             <Text style={[styles.formTitle, { marginTop: 24 }]}>Payment Method</Text>
-            <View style={styles.radioCardSelected}>
-              <View style={styles.radioRow}>
-                <Feather name="credit-card" size={20} color="#2563eb" />
-                <View style={styles.radioInfo}>
-                  <Text style={styles.radioTitle}>Manual / Cash on Delivery</Text>
-                  <Text style={styles.radioSub}>Pay on arrival / Test mode</Text>
+            {providers.length === 0 ? (
+              <View style={styles.radioCard}>
+                <View style={styles.radioRow}>
+                  <ActivityIndicator size="small" color="#9ca3af" />
+                  <View style={styles.radioInfo}>
+                    <Text style={styles.radioSub}>Loading payment methods…</Text>
+                  </View>
                 </View>
               </View>
-            </View>
+            ) : (
+              providers.map((id) => {
+                const isRazorpay = id.includes('razorpay');
+                const selected = selectedProvider === id;
+                return (
+                  <TouchableOpacity
+                    key={id}
+                    style={[styles.radioCard, selected && styles.radioCardSelected]}
+                    onPress={() => setSelectedProvider(id)}
+                  >
+                    <View style={styles.radioRow}>
+                      <Feather name="credit-card" size={20} color="#2563eb" />
+                      <View style={styles.radioInfo}>
+                        <Text style={styles.radioTitle}>
+                          {isRazorpay ? 'Card, UPI & Netbanking' : 'Cash on Delivery'}
+                        </Text>
+                        <Text style={styles.radioSub}>
+                          {isRazorpay ? 'Pay securely via Razorpay' : 'Pay on arrival'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+            {selectedProvider?.includes('razorpay') && (
+              <Text style={styles.paymentNote}>
+                Card details are entered on Razorpay and never reach this app.
+              </Text>
+            )}
 
             {/* ---- Coupon ---- */}
             <Text style={[styles.formTitle, { marginTop: 24 }]}>Coupon</Text>
@@ -693,6 +809,31 @@ export default function CheckoutScreen() {
           </View>
         )}
       </ScrollView>
+
+      {rzpSession && (
+        <RazorpayCheckout
+          visible
+          keyId={rzpSession.keyId}
+          orderId={rzpSession.orderId}
+          amountInPaise={rzpSession.amountInPaise}
+          currency={rzpSession.currency}
+          customer={{
+            name: [user?.first_name, user?.last_name].filter(Boolean).join(' '),
+            email: user?.email,
+            contact: addresses.find((a) => a.id === selectedAddressId)?.phone,
+          }}
+          onSuccess={handleRazorpaySuccess}
+          onCancel={() => {
+            setRzpSession(null);
+            setIsLoading(false);
+          }}
+          onError={(message) => {
+            setRzpSession(null);
+            setIsLoading(false);
+            Alert.alert('Payment Failed', message);
+          }}
+        />
+      )}
 
       <CouponSheet
         visible={sheetVisible}
@@ -947,6 +1088,12 @@ const styles = StyleSheet.create({
   autoPromoCode: {
     fontWeight: '700',
     color: '#111827',
+  },
+  paymentNote: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 6,
+    lineHeight: 15,
   },
   couponErrorText: {
     flex: 1,

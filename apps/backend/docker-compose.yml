@@ -97,6 +97,12 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT:-}
 
       # The shared team login, created automatically on first boot.
+      # Razorpay. Absent values leave the provider unregistered, so a developer
+      # without credentials still gets a bootable backend.
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+
       MEDUSA_ADMIN_EMAIL: ${MEDUSA_ADMIN_EMAIL:-admin@kudl.com}
       MEDUSA_ADMIN_PASSWORD: ${MEDUSA_ADMIN_PASSWORD:?MEDUSA_ADMIN_PASSWORD is required}
     ports:

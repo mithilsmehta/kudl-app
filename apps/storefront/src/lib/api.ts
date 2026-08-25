@@ -564,23 +564,72 @@ export const removeCoupon = async (
   return data.cart
 }
 
+export interface PaymentProvider {
+  id: string
+  is_enabled?: boolean
+}
+
+/**
+ * Payment providers enabled for the cart's region. The ids are Medusa's own, e.g.
+ * "pp_system_default" or "pp_razorpay_razorpay".
+ */
+export const getPaymentProviders = async (
+  regionId: string
+): Promise<PaymentProvider[]> => {
+  try {
+    const data = await apiRequest<{ payment_providers: PaymentProvider[] }>(
+      `/store/payment-providers?region_id=${encodeURIComponent(regionId)}`
+    )
+    return data.payment_providers || []
+  } catch (e) {
+    console.log("Error fetching payment providers:", e)
+    return []
+  }
+}
+
+/** Everything the client needs to open Razorpay Checkout, produced by the backend. */
+export interface RazorpaySession {
+  razorpay_order_id: string
+  key_id: string
+  amount_in_paise: number
+  currency: string
+}
+
+export interface PaymentSession {
+  id: string
+  provider_id: string
+  data?: Record<string, unknown>
+}
+
+/**
+ * Creates the payment collection and a session for the chosen provider, returning
+ * the session so the caller can read provider-specific data off it.
+ *
+ * `data` is forwarded to the provider. For Razorpay it carries the completed
+ * Checkout handshake on the second call, which the backend verifies before treating
+ * the payment as real.
+ */
 export const initiatePaymentSession = async (
   cartId: string,
-  providerId: string = "pp_system_default"
-): Promise<void> => {
+  providerId: string = "pp_system_default",
+  data?: Record<string, unknown>
+): Promise<PaymentSession | null> => {
   const { payment_collection } = await apiRequest<{
     payment_collection: { id: string }
   }>("/store/payment-collections", {
     method: "POST",
     body: JSON.stringify({ cart_id: cartId }),
   })
-  await apiRequest(
-    `/store/payment-collections/${payment_collection.id}/payment-sessions`,
-    {
-      method: "POST",
-      body: JSON.stringify({ provider_id: providerId }),
-    }
-  )
+
+  const res = await apiRequest<{
+    payment_collection: { id: string; payment_sessions?: PaymentSession[] }
+  }>(`/store/payment-collections/${payment_collection.id}/payment-sessions`, {
+    method: "POST",
+    body: JSON.stringify({ provider_id: providerId, ...(data ? { data } : {}) }),
+  })
+
+  const sessions = res.payment_collection?.payment_sessions ?? []
+  return sessions.find((s) => s.provider_id === providerId) ?? sessions[0] ?? null
 }
 
 export const completeCart = async (

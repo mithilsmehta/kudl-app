@@ -29,6 +29,7 @@ import {
   ArrowRight,
   Tag,
   ChevronRight,
+  Shield,
 } from "@/components/icons"
 import {
   Address,
@@ -42,11 +43,13 @@ import {
   getCustomerAddresses,
   getCoupons,
   getShippingOptions,
+  getPaymentProviders,
   initiatePaymentSession,
   removeCoupon,
   updateCartAddress,
 } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
+import { openRazorpayCheckout, type RazorpayHandshake } from "@/lib/razorpay"
 import { useCart } from "@/context/CartContext"
 import { useRequireAuth } from "@/lib/useRequireAuth"
 import AddressForm, {
@@ -80,6 +83,14 @@ export default function CheckoutPage() {
   const [shippingUpdating, setShippingUpdating] = useState(false)
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  /*
+   * Payment providers come from the backend rather than being hardcoded, so the
+   * Razorpay id (pp_razorpay_razorpay) never has to be duplicated here and the
+   * option simply disappears if the backend has no credentials configured.
+   */
+  const [providers, setProviders] = useState<string[]>([])
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
 
   // Coupon
   const [couponCode, setCouponCode] = useState("")
@@ -190,6 +201,26 @@ export default function CheckoutPage() {
       cancelled = true
     }
   }, [isReady, prefillName])
+
+  useEffect(() => {
+    const regionId = cart?.region_id
+    if (!regionId) return
+    let cancelled = false
+    getPaymentProviders(regionId).then((list) => {
+      if (cancelled) return
+      const ids = list.filter((p) => p.is_enabled !== false).map((p) => p.id)
+      setProviders(ids)
+      // Prefer Razorpay when the backend offers it, otherwise fall back to whatever
+      // provider exists (the default manual one in a store without credentials).
+      setSelectedProvider(
+        (current) =>
+          current ?? ids.find((id) => id.includes("razorpay")) ?? ids[0] ?? null
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [cart?.region_id])
 
   useEffect(() => {
     if (cart?.id) loadShipping(cart.id, selectedShippingId)
@@ -356,7 +387,53 @@ export default function CheckoutPage() {
       if (selectedShippingId) {
         await addShippingMethod(cart.id, selectedShippingId)
       }
-      await initiatePaymentSession(cart.id)
+
+      const providerId = selectedProvider ?? "pp_system_default"
+      const session = await initiatePaymentSession(cart.id, providerId)
+
+      /*
+       * Razorpay needs the customer to authorise the payment in its own Checkout
+       * before the cart can be completed. The backend created a Razorpay order and
+       * returned its id plus the public key on the session, so nothing about the
+       * payment is configured or computed here.
+       */
+      if (providerId.includes("razorpay")) {
+        const data = (session?.data ?? {}) as Record<string, any>
+        const orderId = data.razorpay_order_id as string | undefined
+        const keyId = data.key_id as string | undefined
+
+        if (!orderId || !keyId) {
+          throw new Error(
+            "Payment could not be started. Please try again in a moment."
+          )
+        }
+
+        const handshake: RazorpayHandshake = await openRazorpayCheckout({
+          keyId,
+          orderId,
+          amountInPaise: Number(data.amount_in_paise ?? 0),
+          currency: String(data.currency ?? "INR"),
+          storeName: "KUDL Pet Store",
+          description: `Order for ${user?.email ?? "your cart"}`,
+          customer: {
+            name: [user?.first_name, user?.last_name].filter(Boolean).join(" "),
+            email: user?.email,
+            contact: addresses.find((a) => a.id === selectedAddressId)?.phone,
+          },
+        })
+
+        /*
+         * Hand the signed result back so the backend can verify it. The provider
+         * recognises a completed handshake and keeps the order that was actually
+         * paid rather than creating a new one.
+         */
+        await initiatePaymentSession(cart.id, providerId, {
+          ...data,
+          razorpay_payment_id: handshake.razorpay_payment_id,
+          razorpay_signature: handshake.razorpay_signature,
+        })
+      }
+
       const res = await completeCart(cart.id)
       if (res.type === "order" && res.order) {
         setPlacedOrder(res.order)
@@ -606,17 +683,58 @@ export default function CheckoutPage() {
             <h2 className="mb-3 mt-6 text-base font-bold text-kudl-ink">
               Payment Method
             </h2>
-            <div className="flex items-center gap-3 rounded-kudl-card border border-kudl-primary bg-white p-4 ring-1 ring-kudl-primary">
-              <CreditCard className="h-5 w-5 shrink-0 text-kudl-primary" aria-hidden="true" />
-              <span>
-                <span className="block text-[15px] font-semibold text-kudl-ink">
-                  Manual / Cash on Delivery
+            {providers.length === 0 ? (
+              <div className="flex items-center gap-3 rounded-kudl-card border border-kudl-border bg-white p-4">
+                <Spinner className="h-4 w-4 text-kudl-faint" label="Loading payment methods" />
+                <span className="text-[13px] text-kudl-muted">
+                  Loading payment methods…
                 </span>
-                <span className="block text-[13px] text-kudl-muted">
-                  Pay on arrival
-                </span>
-              </span>
-            </div>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {providers.map((id) => {
+                  const isRazorpay = id.includes("razorpay")
+                  const selected = selectedProvider === id
+                  return (
+                    <li key={id}>
+                      <label
+                        className={`flex cursor-pointer items-center gap-3 rounded-kudl-card border bg-white p-4 ${
+                          selected
+                            ? "border-kudl-primary ring-1 ring-kudl-primary"
+                            : "border-kudl-border"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="payment-provider"
+                          className="sr-only"
+                          checked={selected}
+                          onChange={() => setSelectedProvider(id)}
+                        />
+                        <CreditCard className="h-5 w-5 shrink-0 text-kudl-primary" aria-hidden="true" />
+                        <span className="flex-1">
+                          <span className="block text-[15px] font-semibold text-kudl-ink">
+                            {isRazorpay ? "Card, UPI & Netbanking" : "Cash on Delivery"}
+                          </span>
+                          <span className="block text-[13px] text-kudl-muted">
+                            {isRazorpay
+                              ? "Pay securely via Razorpay"
+                              : "Pay on arrival"}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            {selectedProvider?.includes("razorpay") && (
+              <p className="mt-2 flex items-start gap-1.5 text-[11px] text-kudl-faint">
+                <Shield className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+                Card details are entered on Razorpay and never reach this site.
+              </p>
+            )}
 
             {/* ---- Coupon ---- */}
             <h2 className="mb-3 mt-6 text-base font-bold text-kudl-ink">
