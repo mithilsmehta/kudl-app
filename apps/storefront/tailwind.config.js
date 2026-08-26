@@ -39,6 +39,17 @@ module.exports = {
           "amber-ink": "#78350f",
           "amber-body": "#92400e",
           "amber-icon": "#f59e0b",
+          /*
+           * Web-only decorative accents. The mobile app has no equivalent
+           * screens (stats strips, app-promo banners) that would need these
+           * mirrored, so — unlike everything above — they live only here.
+           */
+          coral: "#f4645c",
+          "coral-light": "#feeceb",
+          teal: "#0d9488",
+          "teal-light": "#e6fffb",
+          violet: "#7c3aed",
+          "violet-light": "#f3ebfe",
         },
       },
       backgroundImage: {
@@ -46,6 +57,10 @@ module.exports = {
         "kudl-header": "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)",
         /* Mobile hero LinearGradient: ['#fef3c7', '#fde68a'] at 135deg */
         "kudl-hero": "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+        /* Web-only gradients for new sections without a mobile counterpart */
+        "kudl-violet": "linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #9333ea 100%)",
+        "kudl-teal": "linear-gradient(135deg, #0f766e 0%, #0d9488 100%)",
+        "kudl-sunset": "linear-gradient(135deg, #f4645c 0%, #fb923c 100%)",
       },
       borderRadius: {
         /* Mobile borderRadius values that Tailwind's scale doesn't cover */
@@ -64,6 +79,26 @@ module.exports = {
           "Arial",
           "sans-serif",
         ],
+      },
+      keyframes: {
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        blob: {
+          "0%, 100%": { transform: "translate(0, 0) scale(1)" },
+          "33%": { transform: "translate(12px, -18px) scale(1.08)" },
+          "66%": { transform: "translate(-14px, 10px) scale(0.95)" },
+        },
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+      },
+      animation: {
+        "fade-up": "fade-up 0.6s ease-out both",
+        blob: "blob 9s ease-in-out infinite",
+        marquee: "marquee 22s linear infinite",
       },
     },
   },

@@ -17,12 +17,14 @@ export default function ProductImage({
   sizes,
   priority = false,
   iconClassName = "h-8 w-8",
+  imageClassName = "",
 }: {
   src?: string | null
   alt: string
   sizes: string
   priority?: boolean
   iconClassName?: string
+  imageClassName?: string
 }) {
   const [failed, setFailed] = useState(false)
 
@@ -37,12 +39,15 @@ export default function ProductImage({
   return (
     <Image
       src={src}
-      alt={alt}
+      // Guards against next/image's "missing alt" console error if a caller
+      // ever gets a falsy title/alt from incomplete product data — an empty
+      // (decorative) alt is a safe fallback, not a broken build.
+      alt={typeof alt === "string" ? alt : ""}
       fill
       sizes={sizes}
       priority={priority}
       onError={() => setFailed(true)}
-      className="object-cover"
+      className={`object-cover ${imageClassName}`}
     />
   )
 }

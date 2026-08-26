@@ -147,6 +147,8 @@ export interface Product {
   images?: Array<{ id: string; url: string }>
   variants?: ProductVariant[]
   categories?: Array<{ id: string; name: string }>
+  metadata?: Record<string, unknown> | null
+  created_at?: string
 }
 
 let cachedRegionId: string | null = null
@@ -160,14 +162,19 @@ export const getDefaultRegionId = async (): Promise<string | undefined> => {
 }
 
 const PRODUCT_FIELDS =
-  "fields=*variants,*variants.calculated_price,*images,*categories"
+  "fields=*variants,*variants.calculated_price,*images,*categories,metadata,created_at"
+
+// The catalog is small (~30 products); a generous explicit limit keeps
+// Medusa's default page size from silently truncating the /products listing
+// as it grows, without needing real server-side pagination yet.
+const PRODUCT_LIST_LIMIT = 100
 
 export const getProducts = async (): Promise<Product[]> => {
   try {
     const regionId = await getDefaultRegionId()
     const regionParam = regionId ? `&region_id=${regionId}` : ""
     const data = await apiRequest<{ products: Product[] }>(
-      `/store/products?${PRODUCT_FIELDS}${regionParam}`
+      `/store/products?${PRODUCT_FIELDS}&limit=${PRODUCT_LIST_LIMIT}${regionParam}`
     )
     return data.products || []
   } catch (e) {

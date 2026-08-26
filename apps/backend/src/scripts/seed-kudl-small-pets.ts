@@ -13,6 +13,7 @@ import {
   createInventoryLevelsWorkflow,
   createProductCategoriesWorkflow,
   createProductsWorkflow,
+  updateProductsWorkflow,
 } from "@medusajs/medusa/core-flows"
 
 /**
@@ -104,19 +105,126 @@ export default async function seedKudlSmallPets({
   }
 
   /*
-   * These products ship WITHOUT images on purpose.
-   *
-   * Real photography isn't available here, and a generated "text on a box"
-   * placeholder looks worse than nothing: the homepage category tile borrows the
-   * first product image in the category as its artwork, so a text placeholder
-   * ends up rendered as the Small Pets tile itself, beside real photos of dogs
-   * and cats.
-   *
-   * With no image, both clients fall back to their own designed empty state (a
-   * grey product-bag icon), which reads as deliberate. Uploading a photo in
-   * Medusa Admin fixes it everywhere at once, since the storefront and the app
-   * both read product.thumbnail and prefer whatever Medusa serves.
+   * These products now ship WITH stock photography (Unsplash), matching the
+   * pattern in seed-kudl-pets.ts's `productImages` map. They originally
+   * shipped without images — real photography wasn't available and a
+   * generated "text on a box" placeholder looked worse than the grey
+   * fallback icon both clients render for a missing thumbnail — but a
+   * products-listing page where a fifth of the catalogue is permanently
+   * blank reads as broken rather than deliberate, so every product gets a
+   * real (if generic) photo instead. Swap for real product photography in
+   * Medusa Admin whenever it's available; both clients already prefer
+   * whatever Medusa serves over these placeholders.
    */
+  const productImages: Record<string, string> = {
+    "budgie-cockatiel-seed-mix":
+      "https://images.unsplash.com/photo-1591198936750-16d8e15edb9e?w=1200&h=1200&fit=crop",
+    "bird-cage-perch-swing-set":
+      "https://images.unsplash.com/photo-1522858547137-f1dcec554f55?w=1200&h=1200&fit=crop",
+    "tropical-fish-flakes":
+      "https://images.unsplash.com/photo-1524704796725-9fc3044a58b2?w=1200&h=1200&fit=crop",
+    "aquarium-sponge-filter":
+      "https://images.unsplash.com/photo-1520302519568-1c69dab5b19a?w=1200&h=1200&fit=crop",
+    "hamster-wooden-chew-sticks":
+      "https://images.unsplash.com/photo-1425082661705-1834bfd09dca?w=1200&h=1200&fit=crop",
+    "silent-spinner-exercise-wheel":
+      "https://images.unsplash.com/photo-1548767797-d8c844163c4c?w=1200&h=1200&fit=crop",
+    "timothy-hay-rabbits":
+      "https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=1200&h=1200&fit=crop",
+    "rabbit-grooming-brush":
+      "https://images.unsplash.com/photo-1591561582301-7ce6588cc286?w=1200&h=1200&fit=crop",
+    "aspen-bedding-small-pets":
+      "https://images.unsplash.com/photo-1591946614720-90a587da4a36?w=1200&h=1200&fit=crop",
+    "no-drip-water-bottle":
+      "https://images.unsplash.com/photo-1560743641-3914f2c45636?w=1200&h=1200&fit=crop",
+  }
+
+  /*
+   * Facet metadata for the storefront's /products filters, following the
+   * same brand/category/petType/rating pattern seed-kudl-merchandising.ts
+   * stamps on the Dogs/Cats catalogue. Fixed demo values, not random, so
+   * re-seeding is deterministic. There's no per-species brand here — all ten
+   * products carry the KUDL Essentials house brand. `petType` splits the
+   * single flat "Small Pets" category into the five pet types the storefront
+   * filters by (birds / fish / small-pets for hamsters, rabbits and shared
+   * supplies).
+   */
+  const productFacets: Record<
+    string,
+    {
+      petType: "birds" | "fish" | "small-pets"
+      category:
+        | "food"
+        | "treats"
+        | "toys"
+        | "grooming-health"
+        | "litter-habitat"
+        | "accessories"
+      rating: number
+      reviewCount: number
+    }
+  > = {
+    "budgie-cockatiel-seed-mix": {
+      petType: "birds",
+      category: "food",
+      rating: 4.2,
+      reviewCount: 37,
+    },
+    "bird-cage-perch-swing-set": {
+      petType: "birds",
+      category: "accessories",
+      rating: 4.0,
+      reviewCount: 22,
+    },
+    "tropical-fish-flakes": {
+      petType: "fish",
+      category: "food",
+      rating: 4.3,
+      reviewCount: 61,
+    },
+    "aquarium-sponge-filter": {
+      petType: "fish",
+      category: "accessories",
+      rating: 4.1,
+      reviewCount: 29,
+    },
+    "hamster-wooden-chew-sticks": {
+      petType: "small-pets",
+      category: "treats",
+      rating: 4.4,
+      reviewCount: 44,
+    },
+    "silent-spinner-exercise-wheel": {
+      petType: "small-pets",
+      category: "accessories",
+      rating: 4.6,
+      reviewCount: 53,
+    },
+    "timothy-hay-rabbits": {
+      petType: "small-pets",
+      category: "food",
+      rating: 4.5,
+      reviewCount: 68,
+    },
+    "rabbit-grooming-brush": {
+      petType: "small-pets",
+      category: "grooming-health",
+      rating: 3.9,
+      reviewCount: 18,
+    },
+    "aspen-bedding-small-pets": {
+      petType: "small-pets",
+      category: "litter-habitat",
+      rating: 4.2,
+      reviewCount: 31,
+    },
+    "no-drip-water-bottle": {
+      petType: "small-pets",
+      category: "accessories",
+      rating: 4.0,
+      reviewCount: 26,
+    },
+  }
 
   type ProductSeed = {
     title: string
@@ -244,6 +352,12 @@ export default async function seedKudlSmallPets({
           weight: p.weight,
           status: ProductStatus.PUBLISHED,
           shipping_profile_id: shippingProfile.id,
+          images: [{ url: productImages[p.handle] }],
+          metadata: {
+            brand: "KUDL Essentials",
+            inStock: true,
+            ...productFacets[p.handle],
+          },
           // Declared inline so each product owns an exclusive Pack Size option
           // holding only its own values, matching seed-kudl-pets.ts.
           options: [
@@ -262,6 +376,39 @@ export default async function seedKudlSmallPets({
     logger.info(`Created ${newProducts.length} Small Pets products.`)
   } else {
     logger.info("Small Pets products already exist, skipping.")
+  }
+
+  // ---- Backfill images + facet metadata on products that already existed ----
+  // createProductsWorkflow above only runs for brand-new products, so a store
+  // seeded before this metadata/image support was added needs its existing
+  // Small Pets products updated separately, matching the update-by-handle
+  // pattern in seed-kudl-merchandising.ts.
+  const { data: allSmallPetProducts } = await query.graph({
+    entity: "product",
+    fields: ["id", "handle", "metadata", "thumbnail"],
+    filters: { handle: products.map((p) => p.handle) },
+  })
+
+  const facetUpdates = allSmallPetProducts
+    .filter((p: any) => productFacets[p.handle])
+    .map((p: any) => ({
+      id: p.id,
+      images: [{ url: productImages[p.handle] }],
+      metadata: {
+        ...(p.metadata ?? {}),
+        brand: "KUDL Essentials",
+        inStock: p.metadata?.inStock ?? true,
+        ...productFacets[p.handle],
+      },
+    }))
+
+  if (facetUpdates.length) {
+    await updateProductsWorkflow(container).run({
+      input: { products: facetUpdates },
+    })
+    logger.info(
+      `Updated ${facetUpdates.length} Small Pets products with images + facet metadata.`
+    )
   }
 
   // ---- Inventory ----

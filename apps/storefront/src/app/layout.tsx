@@ -2,8 +2,10 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { AuthProvider } from "@/context/AuthContext"
 import { CartProvider } from "@/context/CartContext"
+import { WishlistProvider } from "@/context/WishlistContext"
 import TopNav from "@/components/TopNav"
 import TabBar from "@/components/TabBar"
+import Footer from "@/components/Footer"
 
 export const metadata: Metadata = {
   title: {
@@ -27,13 +29,16 @@ export default function RootLayout({
       <body className="min-h-screen bg-kudl-bg font-sans">
         <AuthProvider>
           <CartProvider>
-            <TopNav />
-            {/*
-              pb-20 clears the fixed bottom tab bar on narrow viewports. On md+
-              the tab bar is hidden, so the padding is dropped.
-            */}
-            <main className="pb-20 md:pb-16">{children}</main>
-            <TabBar />
+            <WishlistProvider>
+              <TopNav />
+              <main>{children}</main>
+              {/*
+                Footer carries its own bottom padding to clear the fixed
+                mobile TabBar, since it's the last element before it.
+              */}
+              <Footer />
+              <TabBar />
+            </WishlistProvider>
           </CartProvider>
         </AuthProvider>
       </body>

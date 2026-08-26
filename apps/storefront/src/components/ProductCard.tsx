@@ -11,7 +11,8 @@ import { useState } from "react"
 import { Product } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
 import { useCart } from "@/context/CartContext"
-import { ShoppingBag } from "@/components/icons"
+import { useWishlist } from "@/context/WishlistContext"
+import { ShoppingBag, Heart } from "@/components/icons"
 import ProductImage from "@/components/ProductImage"
 import Spinner from "@/components/Spinner"
 
@@ -27,9 +28,17 @@ export const formatProductPrice = (product: Product): string => {
   return "Price unavailable"
 }
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({
+  product,
+  onQuickView,
+}: {
+  product: Product
+  onQuickView?: (product: Product) => void
+}) {
   const { addToCart } = useCart()
+  const { has, toggle } = useWishlist()
   const [isAdding, setIsAdding] = useState(false)
+  const isWishlisted = has(product.id)
 
   const variantId = product.variants?.[0]?.id
 
@@ -47,18 +56,50 @@ export default function ProductCard({ product }: { product: Product }) {
 
   return (
     <div className="group relative overflow-hidden rounded-[14px] border border-kudl-border bg-white shadow-sm transition-shadow hover:shadow-md">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault()
+          toggle(product.id)
+        }}
+        aria-pressed={isWishlisted}
+        aria-label={
+          isWishlisted
+            ? `Remove ${product.title} from wishlist`
+            : `Add ${product.title} to wishlist`
+        }
+        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-kudl-muted shadow-sm transition-colors hover:text-kudl-danger focus:outline-none focus-visible:ring-2 focus-visible:ring-kudl-primary"
+      >
+        <Heart
+          className={`h-4 w-4 ${isWishlisted ? "fill-kudl-danger text-kudl-danger" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
       <Link href={`/product/${product.id}`} className="block">
-        <div className="relative aspect-[1/1.1] w-full bg-kudl-surface">
+        <div className="relative aspect-[1/1.1] w-full overflow-hidden bg-kudl-surface">
           <ProductImage
             src={product.thumbnail || product.images?.[0]?.url}
             alt={product.title}
             sizes="(max-width: 767px) 50vw, (max-width: 1279px) 33vw, 240px"
+            imageClassName="transition-transform duration-300 group-hover:scale-110"
           />
+          {onQuickView && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                onQuickView(product)
+              }}
+              className="absolute inset-x-2 bottom-2 hidden translate-y-1 rounded-full bg-white/95 py-1.5 text-xs font-semibold text-kudl-ink opacity-0 shadow-sm transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 md:block"
+            >
+              Quick View
+            </button>
+          )}
         </div>
         <div className="p-2.5">
-          <p className="truncate text-[11px] font-medium uppercase text-kudl-faint">
+          <span className="inline-block rounded-full bg-kudl-tint px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-kudl-primary">
             {product.categories?.[0]?.name || "Collection"}
-          </p>
+          </span>
           <p className="mt-0.5 truncate text-sm font-semibold text-kudl-ink">
             {product.title}
           </p>

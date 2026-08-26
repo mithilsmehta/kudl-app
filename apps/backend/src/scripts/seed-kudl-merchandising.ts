@@ -99,79 +99,197 @@ export default async function seed_kudl_merchandising({
     categoriesAfter.map((c: any) => [c.name, c.id])
   )
 
-  // 3. Assign products to their child category and stamp brand metadata.
-  //    Brand names are demo values only; no partnership is implied.
+  // 3. Assign products to their child category and stamp facet metadata
+  //    (brand, normalized category slug, pet type, breeds, rating,
+  //    review count, stock) so the storefront's /products filters can read
+  //    real data instead of client-only guesses.
+  //    Brand names are demo values only; no partnership is implied. Ratings
+  //    and review counts are fixed demo values (not random) so re-seeding is
+  //    deterministic. `breeds` is an honest reflection of each product's
+  //    description: only "Royal Canin Mini Adult" is actually described as a
+  //    small-breed formula, so it alone gets the narrower breed list — the
+  //    rest are general-purpose dog food/treats/toys and apply to every
+  //    breed in the storefront's existing Shop By Breed lineup.
+  const ALL_BREEDS = [
+    "golden-retriever",
+    "german-shepherd",
+    "labrador",
+    "rottweiler",
+    "beagle",
+    "shih-tzu",
+    "boxer",
+  ]
+
+  type ProductCategorySlug =
+    | "food"
+    | "treats"
+    | "toys"
+    | "grooming-health"
+    | "litter-habitat"
+    | "accessories"
+
   const PRODUCT_MERCH: {
     handle: string
     parent: "Dogs" | "Cats"
     child: string
     brand: string
+    category: ProductCategorySlug
+    // Taxonomy subcategory slug from lib/taxonomy.ts (dogsMenu/catsMenu) on
+    // the storefront — kept separate from `category` above, which stays the
+    // coarse enum the rest of the filter logic already keys off.
+    subcategory: string
+    // Cross-species Pharmacy taxonomy slug (lib/taxonomy.ts pharmacyMenu),
+    // only set for products that also belong on that branch.
+    pharmacyCategory?: string
+    petType: "dogs" | "cats"
+    breeds: string[]
+    rating: number
+    reviewCount: number
+    inStock: boolean
   }[] = [
     {
       handle: "pedigree-adult-dog-food",
       parent: "Dogs",
       child: "Dog Food",
       brand: "Pedigree",
+      category: "food",
+      subcategory: "dry-food",
+      petType: "dogs",
+      breeds: ALL_BREEDS,
+      rating: 4.3,
+      reviewCount: 128,
+      inStock: true,
     },
     {
       handle: "royal-canin-mini-adult",
       parent: "Dogs",
       child: "Dog Food",
       brand: "Royal Canin",
+      category: "food",
+      subcategory: "dry-food",
+      petType: "dogs",
+      breeds: ["beagle", "shih-tzu"],
+      rating: 4.6,
+      reviewCount: 94,
+      inStock: true,
     },
     {
       handle: "drools-puppy-food",
       parent: "Dogs",
       child: "Dog Food",
       brand: "Drools",
+      category: "food",
+      subcategory: "puppy-food",
+      petType: "dogs",
+      breeds: ALL_BREEDS,
+      rating: 4.1,
+      reviewCount: 156,
+      inStock: true,
     },
     {
       handle: "dog-dental-chew",
       parent: "Dogs",
       child: "Dog Treats",
-      brand: "KUDL",
+      brand: "KUDL Essentials",
+      category: "treats",
+      subcategory: "dental-treats",
+      pharmacyCategory: "oral-care",
+      petType: "dogs",
+      breeds: ALL_BREEDS,
+      rating: 4.4,
+      reviewCount: 72,
+      inStock: true,
     },
     {
       handle: "rubber-dog-ball",
       parent: "Dogs",
       child: "Dog Toys",
-      brand: "KUDL",
+      brand: "KUDL Essentials",
+      category: "toys",
+      subcategory: "ball-fetch-toys",
+      petType: "dogs",
+      breeds: ALL_BREEDS,
+      rating: 4.2,
+      reviewCount: 210,
+      inStock: true,
     },
     {
       handle: "dog-grooming-shampoo",
       parent: "Dogs",
       child: "Dog Grooming",
-      brand: "KUDL",
+      brand: "Himalaya",
+      category: "grooming-health",
+      subcategory: "shampoos-conditioners",
+      petType: "dogs",
+      breeds: ALL_BREEDS,
+      rating: 4.0,
+      reviewCount: 58,
+      inStock: true,
     },
     {
       handle: "whiskas-adult-cat-food",
       parent: "Cats",
       child: "Cat Food",
       brand: "Whiskas",
+      category: "food",
+      subcategory: "dry-food",
+      petType: "cats",
+      breeds: [],
+      rating: 4.3,
+      reviewCount: 143,
+      inStock: true,
     },
     {
       handle: "whiskas-tuna-treats",
       parent: "Cats",
       child: "Cat Treats",
       brand: "Whiskas",
+      category: "treats",
+      subcategory: "crunchy-treats",
+      petType: "cats",
+      breeds: [],
+      rating: 4.5,
+      reviewCount: 187,
+      inStock: true,
     },
     {
       handle: "cat-litter-5kg",
       parent: "Cats",
       child: "Cat Litter",
-      brand: "KUDL",
+      brand: "KUDL Essentials",
+      category: "litter-habitat",
+      subcategory: "litter",
+      petType: "cats",
+      breeds: [],
+      rating: 3.9,
+      reviewCount: 96,
+      inStock: false,
     },
     {
       handle: "interactive-cat-toy",
       parent: "Cats",
       child: "Cat Toys",
-      brand: "KUDL",
+      brand: "KUDL Essentials",
+      category: "toys",
+      subcategory: "smart-interactive-toys",
+      petType: "cats",
+      breeds: [],
+      rating: 4.4,
+      reviewCount: 65,
+      inStock: true,
     },
     {
       handle: "cat-grooming-brush",
       parent: "Cats",
       child: "Cat Grooming",
-      brand: "KUDL",
+      brand: "KUDL Essentials",
+      category: "grooming-health",
+      subcategory: "brushes-combs",
+      petType: "cats",
+      breeds: [],
+      rating: 4.1,
+      reviewCount: 41,
+      inStock: true,
     },
   ]
 
@@ -202,7 +320,18 @@ export default async function seed_kudl_merchandising({
       {
         id: product.id,
         category_ids: [parentId, childId],
-        metadata: { ...(product.metadata ?? {}), brand: merch.brand },
+        metadata: {
+          ...(product.metadata ?? {}),
+          brand: merch.brand,
+          category: merch.category,
+          subcategory: merch.subcategory,
+          ...(merch.pharmacyCategory ? { pharmacyCategory: merch.pharmacyCategory } : {}),
+          petType: merch.petType,
+          breeds: merch.breeds,
+          rating: merch.rating,
+          reviewCount: merch.reviewCount,
+          inStock: merch.inStock,
+        },
       },
     ]
   })
@@ -211,7 +340,7 @@ export default async function seed_kudl_merchandising({
     await updateProductsWorkflow(container).run({
       input: { products: updates },
     })
-    logger.info(`Updated ${updates.length} products with category + brand.`)
+    logger.info(`Updated ${updates.length} products with category + facet metadata.`)
   }
 
   logger.info("Finished KUDL Pets merchandising seed.")
