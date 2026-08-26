@@ -3,21 +3,14 @@
  * prices, categories, carts and orders all come from the Store API.
  */
 
-/**
- * Free delivery is NOT automatic. The backend seeds Standard (₹99) and Express
- * (₹199) as unconditional flat rates (see backend seed-kudl-pets.ts), so no
- * cart total earns free shipping on its own. The only free delivery is the
- * KUDLFREE1000 coupon, which the backend gates on a ₹1000 item subtotal
- * (see backend src/lib/coupon-rules.ts).
- *
- * Both values below therefore mirror that coupon rule. If the coupon changes in
- * the backend, change it here — never advertise a threshold checkout won't honour.
+/*
+ * The free-delivery coupon used to be hardcoded here as FREE_DELIVERY_COUPON /
+ * FREE_DELIVERY_MIN_SUBTOTAL. It is not any more: coupons live in Medusa, and a
+ * constant here meant deleting the promotion in the admin left the site still
+ * advertising a dead code. The homepage badge and cart hint now read the live
+ * delivery coupon via lib/useDeliveryCoupon.ts. Do not reintroduce a coupon
+ * code as a frontend constant.
  */
-export const FREE_DELIVERY_COUPON = "KUDLFREE1000"
-export const FREE_DELIVERY_MIN_SUBTOTAL = 1000
-
-export const FREE_DELIVERY_SHORT = `Code ${FREE_DELIVERY_COUPON}`
-export const FREE_DELIVERY_SUB = `Above ₹${FREE_DELIVERY_MIN_SUBTOTAL}`
 
 /**
  * Visual treatment per pet category, keyed by the category name from Medusa.

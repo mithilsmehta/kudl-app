@@ -2,9 +2,9 @@
  * Shop by dog breed. There's no breed photography in the product catalogue,
  * so each card stays a paw-print badge rather than a stock photo standing in
  * for a breed it doesn't actually depict — but /products?breed=<slug> is now
- * a real filter (seed-kudl-merchandising.ts stamps `metadata.breeds` on the
- * Dogs catalogue), so each card deep-links into that instead of a free-text
- * search.
+ * a real filter (the backend's seed-kudl-catalog.ts stamps `metadata.breeds`
+ * on the Dogs catalogue), so each card deep-links into that instead of a
+ * free-text search.
  */
 
 import Link from "next/link"

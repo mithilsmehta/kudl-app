@@ -33,9 +33,9 @@ export const categoryIds = (product: RecommendationCandidate): Set<string> =>
   new Set((product.categories ?? []).map((c) => c.id))
 
 /**
- * Reads `metadata.brand`, stamped on every product by seed-kudl-merchandising.ts
- * and seed-kudl-small-pets.ts (the same field the storefront's /products brand
- * filter reads), so brand affinity and brand faceting stay in sync.
+ * Reads `metadata.brand`, stamped on every product by seed-kudl-catalog.ts
+ * (the same field the storefront's /products brand filter reads), so brand
+ * affinity and brand faceting stay in sync.
  */
 export const brandOf = (product: RecommendationCandidate): string | null => {
   const brand = product.metadata?.brand

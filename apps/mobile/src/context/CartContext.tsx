@@ -107,12 +107,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const removeItem = async (lineItemId: string) => {
     if (!cart?.id) return;
+    const cartId = cart.id;
     setIsLoading(true);
     try {
-      const updated = await removeCartItem(cart.id, lineItemId);
+      const updated = await removeCartItem(cartId, lineItemId);
       setCart(updated);
     } catch (e) {
       console.log('Error removing item:', e);
+      // Re-read from the server rather than leaving whatever is on screen. A
+      // failed delete must not leave the UI disagreeing with Medusa about what
+      // is in the cart. Mirrors the storefront's CartContext.
+      const refetched = await getCart(cartId);
+      if (refetched) setCart(refetched);
     } finally {
       setIsLoading(false);
     }

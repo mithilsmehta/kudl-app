@@ -15,7 +15,6 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Search, ShoppingCart, ShoppingBag, ChevronRight, Grid } from "@/components/icons"
 import { Product, getProducts, getCategories } from "@/lib/api"
-import { isStorefrontPet } from "@/lib/productFacets"
 import { useAuth } from "@/context/AuthContext"
 import { useCart } from "@/context/CartContext"
 import Spinner from "@/components/Spinner"
@@ -56,8 +55,8 @@ export default function HomePage() {
           getCategories(),
         ])
         if (cancelled) return
-        setProducts(prods.filter(isStorefrontPet))
-        setCategories(cats.filter((c) => c.name !== "Small Pets"))
+        setProducts(prods)
+        setCategories(cats)
       } catch (e) {
         console.log("Error loading home data:", e)
       } finally {

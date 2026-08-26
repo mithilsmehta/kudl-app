@@ -1,13 +1,13 @@
 /**
- * Reads the filter facets seed-kudl-merchandising.ts stamps on
- * `product.metadata` (brand, category, petType, breeds, rating,
- * reviewCount, inStock). Mirrors the read-metadata-safely pattern in the
- * backend's src/lib/recommendations/product-signals.ts so both layers agree on
- * what a missing/malformed field means.
+ * Reads the filter facets the backend's seed-kudl-catalog.ts stamps on
+ * `product.metadata` (brand, category, subcategory, pharmacyCategory, petType,
+ * breeds, rating, reviewCount, inStock). Mirrors the read-metadata-safely
+ * pattern in the backend's src/lib/recommendations/product-signals.ts so both
+ * layers agree on what a missing/malformed field means.
  *
- * Storefront scope is Dogs and Cats only — Small Pets/Birds/Fish (still
- * present in the backend's seed-kudl-small-pets.ts and its DB rows) are
- * intentionally not exposed as a PetType here.
+ * The catalog is Dogs and Cats only, and Pharmacy is a cross-species branch
+ * over the same two — so PetType has exactly these two members and every
+ * seeded product carries one.
  */
 
 import { Product } from "@/lib/api"
@@ -32,16 +32,6 @@ export const getPetType = (product: Product): PetType | null => {
   return typeof petType === "string" ? (petType as PetType) : null
 }
 
-// Excludes products stamped with a petType outside this storefront's scope
-// (small-pets/birds/fish, from the backend's seed-kudl-small-pets.ts) so they
-// don't surface in listings/carousels even though the seeded rows still
-// exist in the DB. A product with no petType (e.g. an accessory) passes
-// through unaffected.
-export const isStorefrontPet = (product: Product): boolean => {
-  const petType = product.metadata?.petType
-  return typeof petType !== "string" || petType === "dogs" || petType === "cats"
-}
-
 export const getCategory = (product: Product): ProductCategory | null => {
   const category = product.metadata?.category
   return typeof category === "string" ? (category as ProductCategory) : null
@@ -53,8 +43,9 @@ export const getBreeds = (product: Product): string[] => {
 }
 
 // Taxonomy subcategory slug (e.g. "puppy-food", "dental-treats") — see
-// lib/taxonomy.ts. Separate from `category`, which stays the coarse
-// food/treats/toys/... enum the rest of the filter logic already keys off.
+// lib/taxonomy.ts, whose slugs the backend seed derives this from. Separate
+// from `category`, which stays the coarse food/treats/toys/... enum the rest
+// of the filter logic already keys off.
 export const getSubcategory = (product: Product): string | null => {
   const subcategory = product.metadata?.subcategory
   return typeof subcategory === "string" && subcategory.trim() ? subcategory.trim() : null
@@ -70,7 +61,7 @@ export const getPharmacyCategory = (product: Product): string | null => {
 }
 
 // Demo-catalog default: every seeded product has an explicit rating, but a
-// product added without one shouldn't look unrated in the UI.
+// product added by hand in the admin shouldn't look unrated in the UI.
 export const getRating = (product: Product): number => {
   const rating = product.metadata?.rating
   return typeof rating === "number" ? rating : 4.0

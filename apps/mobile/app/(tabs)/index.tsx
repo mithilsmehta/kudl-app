@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Product, getProducts, getCategories } from '../../src/services/api';
+import { Coupon, Product, getProducts, getCategories, getCoupons } from '../../src/services/api';
 import { useCart } from '../../src/context/CartContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { formatCurrency } from '../../src/utils/currency';
@@ -30,19 +30,18 @@ const FEATURED_CARD_WIDTH = 160;
 const PET_THEMES: Record<string, { to: string; tagline: string }> = {
   Dogs: { to: '#1e40af', tagline: 'Food, toys & care' },
   Cats: { to: '#d97706', tagline: 'Treats & essentials' },
-  'Small Pets': { to: '#047857', tagline: 'Birds, fish & more' },
+  Pharmacy: { to: '#047857', tagline: 'Vet-trusted care' },
 };
 
 const PET_THEME_FALLBACK = { to: '#4b5563', tagline: 'Explore range' };
 
-// Free delivery is NOT automatic: shipping is a flat ₹99/₹199 and the only free
-// delivery is the KUDLFREE1000 coupon at a ₹1000 subtotal (see the backend's
-// src/lib/coupon-rules.ts). Never advertise a threshold checkout won't honour.
-const FREE_DELIVERY_COUPON = 'KUDLFREE1000';
-const FREE_DELIVERY_MIN_SUBTOTAL = 1000;
-
-const TRUST_BADGES = [
-  { icon: 'truck' as const, label: 'Free Delivery', sub: `Above ₹${FREE_DELIVERY_MIN_SUBTOTAL}` },
+// Free delivery is NOT automatic: shipping is a flat ₹99/₹199, so the only free
+// delivery is a coupon that targets shipping. Which coupon that is — and whether
+// one exists at all — is read live from GET /store/coupons rather than hardcoded,
+// so a promotion created in the Medusa admin shows up here by itself and one
+// deleted there stops being advertised. Never promise a threshold checkout
+// won't honour.
+const BASE_TRUST_BADGES = [
   { icon: 'shield' as const, label: '100% Genuine', sub: 'Vet approved' },
   { icon: 'refresh-cw' as const, label: 'Easy Returns', sub: '7 day policy' },
 ];
@@ -55,14 +54,28 @@ export default function HomeScreen() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  // The live delivery coupon, or null when Medusa has none. Null and
+  // still-loading are treated the same: advertise nothing.
+  const [delivery, setDelivery] = useState<Coupon | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
     try {
-      const [prods, cats] = await Promise.all([getProducts(), getCategories()]);
+      const [prods, cats, coupons] = await Promise.all([
+        getProducts(),
+        getCategories(),
+        getCoupons(),
+      ]);
       setProducts(prods);
       setCategories(cats);
+      // Lowest minimum first, so if several delivery coupons exist the one
+      // advertised is the one most customers can actually reach.
+      setDelivery(
+        coupons
+          .filter((c) => c.target_type === 'shipping_methods')
+          .sort((a, b) => a.min_subtotal - b.min_subtotal)[0] ?? null
+      );
     } catch (e) {
       console.log('Error loading home data:', e);
     } finally {
@@ -94,6 +107,21 @@ export default function HomeScreen() {
 
   const featured = products.slice(0, 6);
   const firstName = user?.first_name;
+
+  // Free Delivery leads the strip only when a delivery coupon actually exists;
+  // otherwise it drops out rather than making a promise nothing backs.
+  const trustBadges = delivery
+    ? [
+        {
+          icon: 'truck' as const,
+          label: 'Free Delivery',
+          sub: delivery.min_subtotal
+            ? `Above ₹${delivery.min_subtotal}`
+            : `Code ${delivery.code}`,
+        },
+        ...BASE_TRUST_BADGES,
+      ]
+    : BASE_TRUST_BADGES;
 
   return (
     <View style={styles.container}>
@@ -203,7 +231,7 @@ export default function HomeScreen() {
 
         {/* ---- Trust badges ---- */}
         <View style={styles.trustRow}>
-          {TRUST_BADGES.map((badge) => (
+          {trustBadges.map((badge) => (
             <View key={badge.label} style={styles.trustItem}>
               <View style={styles.trustIconWrap}>
                 <Feather name={badge.icon} size={17} color="#2563eb" />
@@ -218,10 +246,15 @@ export default function HomeScreen() {
           Spells out how the free-delivery badge above is actually earned, so the
           badge is not read as an automatic threshold. Mirrors the storefront.
         */}
-        <Text style={styles.trustNote}>
-          Free delivery applies with code {FREE_DELIVERY_COUPON} on orders above
-          ₹{FREE_DELIVERY_MIN_SUBTOTAL}, entered at checkout.
-        </Text>
+        {delivery && (
+          <Text style={styles.trustNote}>
+            Free delivery applies with code {delivery.code}
+            {delivery.min_subtotal > 0
+              ? ` on orders above ₹${delivery.min_subtotal}`
+              : ''}
+            , entered at checkout.
+          </Text>
+        )}
 
         {/* ---- Featured products ---- */}
         <View style={styles.section}>

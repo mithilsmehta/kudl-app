@@ -13,6 +13,12 @@ import { getCouponRule } from "../../../lib/coupon-rules"
  * Automatic promotions are excluded on purpose. They are not coupons: Medusa
  * applies them by itself, they have no code to enter, and listing them would
  * offer the customer a button that does nothing.
+ *
+ * This endpoint is the ONLY source the clients use to decide which coupons
+ * exist. Nothing in the storefront or the app hardcodes a coupon code, so a
+ * promotion created in the admin dashboard appears on the site by itself, and
+ * one deleted there stops being advertised — including in the homepage and cart
+ * copy, which read the delivery coupon off `target_type` below.
  */
 
 type ApplicationMethod = {
@@ -94,6 +100,9 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   // per-cart eligibility. With one, the customer sees exactly how much more they
   // need to spend rather than discovering it only after tapping Apply.
   let subtotal: number | null = null
+  // Total units in the cart, counting quantity — so two of one product counts
+  // as two. This is what a Buy-x-Get-y offer is really gated on.
+  let itemCount: number | null = null
   let appliedCodes: string[] = []
 
   if (cartId) {
@@ -105,6 +114,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       fields: [
         "id",
         "item_subtotal",
+        "items.quantity",
         "promotions.code",
         "promotions.is_automatic",
       ],
@@ -113,6 +123,10 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     const cart = carts?.[0]
     if (cart) {
       subtotal = Number(cart.item_subtotal ?? 0)
+      itemCount = (cart.items ?? []).reduce(
+        (sum: number, i: any) => sum + Number(i?.quantity ?? 0),
+        0
+      )
       appliedCodes = (cart.promotions ?? [])
         .filter((p: any) => p?.code && !p.is_automatic)
         .map((p: any) => String(p.code))
@@ -124,12 +138,30 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     .map((p: any) => {
       const code = String(p.code)
       const rule = getCouponRule(code)
-      const generated = describe(code, p.application_method)
+      const am = p.application_method
+      const generated = describe(code, am)
       const minSubtotal = rule?.minSubtotal ?? 0
 
-      const eligible = subtotal === null || subtotal >= minSubtotal
+      /*
+       * A Buy-x-Get-y offer needs x+y units in the cart before Medusa's engine
+       * can discount anything. Without this the coupon looked freely available
+       * and only failed on Apply with "does not apply to the items in your
+       * cart", which reads as a broken coupon rather than as "you need one more
+       * item". Derived from the promotion's own quantities, so an offer edited
+       * in the admin from B1G1 to B2G1 updates here with no code change.
+       */
+      const buyQty = Number(am?.buy_rules_min_quantity ?? 0)
+      const getQty = Number(am?.apply_to_quantity ?? 0)
+      const minItems = buyQty > 0 && getQty > 0 ? buyQty + getQty : 0
+
+      const meetsSubtotal = subtotal === null || subtotal >= minSubtotal
+      const meetsItems = itemCount === null || itemCount >= minItems
+      const eligible = meetsSubtotal && meetsItems
+
       const shortfall =
-        subtotal !== null && !eligible ? minSubtotal - subtotal : 0
+        subtotal !== null && !meetsSubtotal ? minSubtotal - subtotal : 0
+      const itemShortfall =
+        itemCount !== null && !meetsItems ? minItems - itemCount : 0
 
       return {
         code,
@@ -137,9 +169,19 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         // Hand-written copy from COUPON_RULES wins over the generated label.
         description: rule?.description ?? generated.detail,
         min_subtotal: minSubtotal,
+        /** Units required in the cart; 0 when the coupon has no item requirement. */
+        min_items: minItems,
         eligible,
         shortfall,
+        /** How many more units the customer must add; 0 when satisfied. */
+        item_shortfall: itemShortfall,
         applied: appliedCodes.includes(code),
+        // What the discount acts on: "shipping_methods", "items" or "order".
+        // Exposed so a client can find, say, the free-delivery coupon without
+        // string-matching the generated title — which is what lets the homepage
+        // and cart advertise whatever delivery coupon actually exists in Medusa
+        // instead of hardcoding a code that may have been deleted.
+        target_type: p.application_method?.target_type ?? null,
       }
     })
     // Eligible coupons first, then the biggest minimums last — the customer sees

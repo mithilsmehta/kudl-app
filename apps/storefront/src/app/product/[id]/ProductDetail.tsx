@@ -9,6 +9,7 @@
  * details on md+, where there's room.
  */
 
+import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Product, ProductVariant, getProductById } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
@@ -28,7 +29,8 @@ import FrequentlyBoughtTogether from "@/components/recommendations/FrequentlyBou
 import { trackEvent } from "@/lib/recommendations"
 
 export default function ProductDetail({ id }: { id: string }) {
-  const { addToCart } = useCart()
+  const router = useRouter()
+  const { addToCart, lineItemForVariant } = useCart()
 
   const [product, setProduct] = useState<Product | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
@@ -38,7 +40,6 @@ export default function ProductDetail({ id }: { id: string }) {
   const [quantity, setQuantity] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
-  const [addedSuccess, setAddedSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -73,8 +74,10 @@ export default function ProductDetail({ id }: { id: string }) {
     setError(null)
     try {
       await addToCart(selectedVariant.id, quantity, product.id)
-      setAddedSuccess(true)
-      setTimeout(() => setAddedSuccess(false), 2000)
+      // No "Added!" timer any more. Once the variant is in the cart the button
+      // becomes "Go to Cart" on its own, because it reads the cart rather than
+      // a flag — which also means it still says "Go to Cart" when the customer
+      // navigates back to this product later in the session.
     } catch (e: any) {
       setError(e?.message || "Could not add item to cart")
     } finally {
@@ -121,21 +124,38 @@ export default function ProductDetail({ id }: { id: string }) {
       ? [product.thumbnail]
       : []
 
+  /*
+   * One button with two jobs, chosen by whether the selected variant is already
+   * in the cart. Deliberately keyed off real cart contents rather than a
+   * just-added flag, which means it is correct on a fresh page load too — come
+   * back to a product you added earlier and it still offers "Go to Cart"
+   * instead of silently adding a second one.
+   *
+   * It tracks the variant, not the product: switching to a pack size that is
+   * not in the cart goes back to "Add to Cart", because that size genuinely
+   * hasn't been added.
+   */
+  const cartLine = selectedVariant ? lineItemForVariant(selectedVariant.id) : undefined
+  const isInCart = Boolean(cartLine)
+
   const addToCartButton = (
     <button
       type="button"
-      onClick={handleAddToCart}
+      onClick={isInCart ? () => router.push("/cart") : handleAddToCart}
       disabled={isAdding || !selectedVariant}
       className={`flex h-[52px] w-full items-center justify-center gap-2 rounded-xl text-base font-bold text-white transition-colors disabled:opacity-70 ${
-        addedSuccess ? "bg-kudl-success" : "bg-kudl-primary hover:bg-kudl-dark"
+        isInCart ? "bg-kudl-success hover:brightness-95" : "bg-kudl-primary hover:bg-kudl-dark"
       }`}
     >
       {isAdding ? (
         <Spinner className="h-5 w-5 text-white" label="Adding to cart" />
-      ) : addedSuccess ? (
+      ) : isInCart ? (
         <>
           <Check className="h-5 w-5" aria-hidden="true" />
-          Added to Cart!
+          Go to Cart
+          <span className="font-semibold opacity-90">
+            ({cartLine!.quantity} in cart)
+          </span>
         </>
       ) : (
         <>

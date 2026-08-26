@@ -25,12 +25,13 @@ import { useAuth } from "@/context/AuthContext"
 import ProductImage from "@/components/ProductImage"
 import ScreenHeader from "@/components/ScreenHeader"
 import Spinner from "@/components/Spinner"
-import { FREE_DELIVERY_COUPON, FREE_DELIVERY_MIN_SUBTOTAL } from "@/lib/config"
+import { useDeliveryCoupon } from "@/lib/useDeliveryCoupon"
 
 export default function CartPage() {
   const router = useRouter()
   const { cart, itemCount, isLoading, updateQuantity, removeItem } = useCart()
   const { user } = useAuth()
+  const delivery = useDeliveryCoupon()
 
   const handleCheckout = () => {
     // Checkout needs a customer for saved addresses and order history.
@@ -167,11 +168,16 @@ export default function CartPage() {
         <ArrowRight className="h-[18px] w-[18px]" aria-hidden="true" />
       </button>
 
-      {/* Only surfaced when the coupon could actually apply, so it reads as useful, not as an upsell. */}
-      {subtotal >= FREE_DELIVERY_MIN_SUBTOTAL && (
+      {/*
+        Named from the live delivery coupon rather than a hardcoded code, and
+        only once the cart actually clears its minimum — so it reads as useful
+        rather than as an upsell, and it disappears by itself if the coupon is
+        deleted in the admin.
+      */}
+      {delivery && subtotal >= delivery.min_subtotal && (
         <p className="mt-3 text-center text-[11px] text-kudl-muted">
           Your subtotal qualifies for free delivery — enter{" "}
-          <span className="font-semibold text-kudl-ink">{FREE_DELIVERY_COUPON}</span>{" "}
+          <span className="font-semibold text-kudl-ink">{delivery.code}</span>{" "}
           at checkout.
         </p>
       )}

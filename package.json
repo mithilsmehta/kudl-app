@@ -22,8 +22,7 @@
     "docker:key": "docker compose -f apps/backend/docker-compose.yml logs medusa | grep 'Publishable API key' | tail -1",
     "docker:ps": "docker compose -f apps/backend/docker-compose.yml ps",
     "go": "docker compose -f apps/backend/docker-compose.yml up -d --wait && npm --prefix apps/mobile start -- -c",
-    "backend:seed:small-pets": "turbo seed:small-pets --filter=@dtc/backend",
-    "backend:seed:promotions": "turbo seed:promotions --filter=@dtc/backend"
+    "backend:seed:catalog": "turbo seed:catalog --filter=@dtc/backend"
   },
   "pnpm": {
     "overrides": {

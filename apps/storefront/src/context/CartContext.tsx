@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react"
 import {
   Cart,
+  CartItem,
   addToCart as apiAddToCart,
   createCart,
   getCart,
@@ -27,6 +28,7 @@ interface CartContextType {
   ) => Promise<void>
   updateQuantity: (lineItemId: string, quantity: number) => Promise<void>
   removeItem: (lineItemId: string) => Promise<void>
+  lineItemForVariant: (variantId: string) => CartItem | undefined
   refreshCart: () => Promise<void>
   resetCart: () => Promise<void>
 }
@@ -38,6 +40,7 @@ const CartContext = createContext<CartContextType>({
   addToCart: async () => {},
   updateQuantity: async () => {},
   removeItem: async () => {},
+  lineItemForVariant: () => undefined,
   refreshCart: async () => {},
   resetCart: async () => {},
 })
@@ -108,16 +111,33 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const removeItem = async (lineItemId: string) => {
     if (!cart?.id) return
+    const cartId = cart.id
     setIsLoading(true)
     try {
-      const updated = await removeCartItem(cart.id, lineItemId)
+      const updated = await removeCartItem(cartId, lineItemId)
       setCart(updated)
     } catch (e) {
       console.log("Error removing item:", e)
+      // Re-read from the server rather than leaving whatever is on screen. A
+      // failed delete must not leave the UI disagreeing with Medusa about
+      // what is in the cart — that is how a removed item appears to come back,
+      // or a kept item appears to have vanished.
+      const refetched = await getCart(cartId)
+      if (refetched) setCart(refetched)
     } finally {
       setIsLoading(false)
     }
   }
+
+  /**
+   * The line for a given variant, if that variant is in the cart. The product
+   * page uses this to swap "Add to Cart" for "Go to Cart" once the variant on
+   * screen is already in the cart — derived from real cart contents rather than
+   * from a transient "just added" flag, so it still reads correctly when the
+   * customer comes back to the product later.
+   */
+  const lineItemForVariant = (variantId: string): CartItem | undefined =>
+    cart?.items?.find((item) => item.variant_id === variantId)
 
   const updateQuantity = async (lineItemId: string, quantity: number) => {
     if (!cart?.id) return
@@ -154,6 +174,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
         addToCart,
         updateQuantity,
         removeItem,
+        lineItemForVariant,
         refreshCart,
         resetCart,
       }}

@@ -3,13 +3,12 @@
 /**
  * All Products — filterable/sortable listing over the live Medusa catalog.
  * Filter facets (pet type, category, breed, brand, rating, stock) read the
- * metadata seed-kudl-merchandising.ts stamps on each product (see
- * src/lib/productFacets.ts). Storefront scope is Dogs/Cats/Pharmacy only —
- * products from the backend's Small Pets seed (seed-kudl-small-pets.ts) may
- * still exist in the catalog but won't match PetType "dogs" | "cats", so
- * they're filtered out here rather than shown unfilterable. Filter/sort/view
- * state is mirrored into the URL so results are shareable and survive
- * back/reload, the same way the old page honoured `category` and `q`.
+ * metadata the backend's seed-kudl-catalog.ts stamps on each product (see
+ * src/lib/productFacets.ts). Every product in the catalog is a Dogs, Cats or
+ * Pharmacy product, so the whole catalog is shown and filtered rather than
+ * pre-filtered on load. Filter/sort/view state is mirrored into the URL so
+ * results are shareable and survive back/reload, the same way the old page
+ * honoured `category` and `q`.
  */
 
 import { useRouter, useSearchParams } from "next/navigation"
@@ -27,7 +26,6 @@ import {
   getRating,
   getReviewCount,
   getSubcategory,
-  isStorefrontPet,
   PetType,
   ProductCategory,
 } from "@/lib/productFacets"
@@ -149,8 +147,8 @@ function ProductsView() {
       try {
         const [prods, cats] = await Promise.all([getProducts(), getCategories()])
         if (cancelled) return
-        setProducts(prods.filter(isStorefrontPet))
-        setCategories(cats.filter((c) => c.name !== "Small Pets"))
+        setProducts(prods)
+        setCategories(cats)
       } catch (e) {
         console.log("Error loading products:", e)
       } finally {

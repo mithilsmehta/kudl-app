@@ -145,11 +145,28 @@ export const getDefaultRegionId = async (): Promise<string | undefined> => {
   return cachedRegionId || undefined;
 };
 
+/**
+ * Every scalar is named explicitly alongside the relations. Medusa's `fields`
+ * param switches from "defaults plus these relations" to "only these" as soon
+ * as a scalar column is named, so listing `metadata` without also listing
+ * `description` and `thumbnail` silently drops them. Mirrors PRODUCT_FIELDS in
+ * the storefront's src/lib/api.ts.
+ */
+const PRODUCT_FIELDS =
+  'fields=id,title,handle,subtitle,description,thumbnail,created_at,metadata,' +
+  '*variants,*variants.calculated_price,*images,*categories';
+
+// An explicit limit clear of the seeded catalog size (100 products, see the
+// backend's seed-kudl-catalog.ts). Without it this took Medusa's default page
+// size and silently showed only the first slice of the catalog. Mirrors
+// PRODUCT_LIST_LIMIT in the storefront's src/lib/api.ts.
+const PRODUCT_LIST_LIMIT = 300;
+
 export const getProducts = async (): Promise<Product[]> => {
   try {
     const regionId = await getDefaultRegionId();
     const regionParam = regionId ? `&region_id=${regionId}` : '';
-    const data = await apiRequest<{ products: Product[] }>(`/store/products?fields=*variants,*variants.calculated_price,*images,*categories${regionParam}`);
+    const data = await apiRequest<{ products: Product[] }>(`/store/products?${PRODUCT_FIELDS}&limit=${PRODUCT_LIST_LIMIT}${regionParam}`);
     return data.products || [];
   } catch (e) {
     console.log('Error fetching products:', e);
@@ -161,7 +178,7 @@ export const getProductById = async (id: string): Promise<Product | null> => {
   try {
     const regionId = await getDefaultRegionId();
     const regionParam = regionId ? `&region_id=${regionId}` : '';
-    const data = await apiRequest<{ product: Product }>(`/store/products/${id}?fields=*variants,*variants.calculated_price,*images,*categories${regionParam}`);
+    const data = await apiRequest<{ product: Product }>(`/store/products/${id}?${PRODUCT_FIELDS}${regionParam}`);
     return data.product || null;
   } catch (e) {
     console.log(`Error fetching product ${id}:`, e);
@@ -169,9 +186,18 @@ export const getProductById = async (id: string): Promise<Product | null> => {
   }
 };
 
+/**
+ * The top-level departments only — Dogs, Cats, Pharmacy.
+ *
+ * `parent_category_id=null` is load-bearing rather than tidiness. The backend
+ * seed builds the full mega-menu taxonomy as a real three-level category tree
+ * (see the backend's seed-kudl-catalog.ts), so an unfiltered call returns
+ * hundreds of categories and the home screen would render a pet card for every
+ * one of them. Mirrors getCategories in the storefront's src/lib/api.ts.
+ */
 export const getCategories = async (): Promise<Array<{ id: string; name: string }>> => {
   try {
-    const data = await apiRequest<{ product_categories: Array<{ id: string; name: string }> }>('/store/product-categories');
+    const data = await apiRequest<{ product_categories: Array<{ id: string; name: string }> }>('/store/product-categories?parent_category_id=null&limit=20');
     return data.product_categories || [];
   } catch (e) {
     return [];
@@ -379,11 +405,35 @@ export const updateCartItem = async (cartId: string, lineItemId: string, quantit
   return data.cart;
 };
 
+/**
+ * Removes ONE line item from the cart.
+ *
+ * Medusa's DELETE /store/carts/:id/line-items/:line_id does not answer with
+ * `{ cart }` like the POST routes do — it answers with
+ * `{ id, object: "line-item", deleted: true, parent: <cart> }`. Reading
+ * `data.cart` off that gives `undefined`, and handing `undefined` to the cart
+ * state made the whole cart render as empty after deleting a single item: it
+ * looked like every item had been removed when in fact Medusa still held the
+ * rest. The fix is to read `parent`.
+ *
+ * `data.cart` is kept as a fallback purely so this keeps working if a future
+ * Medusa version normalises the shape.
+ */
 export const removeCartItem = async (cartId: string, lineItemId: string): Promise<Cart> => {
-  const data = await apiRequest<{ cart: Cart }>(`/store/carts/${cartId}/line-items/${lineItemId}`, {
+  const data = await apiRequest<{ parent?: Cart; cart?: Cart }>(`/store/carts/${cartId}/line-items/${lineItemId}`, {
     method: 'DELETE',
   });
-  return data.cart;
+  const cart = data.parent ?? data.cart;
+  if (!cart) {
+    // Never return undefined: the caller would blank the cart state and the
+    // screen would claim the cart is empty. Refetch instead.
+    const refetched = await getCart(cartId);
+    if (!refetched) {
+      throw new Error('Could not read the cart after removing the item.');
+    }
+    return refetched;
+  }
+  return cart;
 };
 
 export const updateCartAddress = async (cartId: string, shippingAddress: {
@@ -448,7 +498,18 @@ export interface Coupon {
   eligible: boolean;
   /** How much more the customer must add to qualify; 0 when eligible. */
   shortfall: number;
+  /** Units required in the cart, e.g. 2 for Buy-1-Get-1; 0 when unrestricted. */
+  min_items: number;
+  /** How many more units the customer must add; 0 when satisfied. */
+  item_shortfall: number;
   applied: boolean;
+  /**
+   * What the discount acts on: "shipping_methods", "items" or "order". Used to
+   * find the delivery coupon without matching on its title, so the home screen
+   * advertises whatever delivery coupon exists in Medusa rather than a
+   * hardcoded code.
+   */
+  target_type?: string | null;
 }
 
 // Lists the coupons the customer can pick from. Passing the cart id makes the

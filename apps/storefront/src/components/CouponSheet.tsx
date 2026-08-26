@@ -158,10 +158,23 @@ export default function CouponSheet({
                           {c.description}
                         </p>
 
+                        {/*
+                          Two different reasons a coupon can be out of reach, so
+                          two different messages. A Buy-x-Get-y offer needs more
+                          UNITS, not more money — saying "add ₹0 more" or
+                          nothing at all is what made B1G1 look broken.
+                        */}
                         {!c.eligible && c.shortfall > 0 && (
                           <p className="mt-1.5 text-[12px] font-semibold text-kudl-amber-body">
                             Add {formatCurrency(c.shortfall, currencyCode)} more
                             to use this
+                          </p>
+                        )}
+                        {!c.eligible && c.item_shortfall > 0 && (
+                          <p className="mt-1.5 text-[12px] font-semibold text-kudl-amber-body">
+                            Add {c.item_shortfall} more{" "}
+                            {c.item_shortfall === 1 ? "item" : "items"} to use
+                            this
                           </p>
                         )}
                       </div>

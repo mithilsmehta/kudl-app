@@ -1,12 +1,15 @@
 /**
  * Extracted from the homepage's inline "Shop by Pet" grid. Scoped to exactly
  * the three departments this storefront sells into — Dogs, Cats, Pharmacy —
- * so it no longer mirrors whatever categories happen to exist in Medusa
- * (that used to also surface "Small Pets", which this storefront doesn't
- * carry). Dogs/Cats still pick a real product thumbnail per category rather
- * than stock art; Pharmacy has no Medusa category of its own (it's a
- * cross-species taxonomy branch — see lib/taxonomy.ts), so its tile uses the
- * thumbnail of any product tagged with a pharmacyCategory instead.
+ * rather than mirroring whatever categories happen to exist in Medusa.
+ *
+ * Dogs and Cats are driven off their real Medusa categories and pick a product
+ * thumbnail from each. Pharmacy is deliberately not: it does have a Medusa
+ * category tree of its own now, but it is the cross-species branch of the
+ * taxonomy (see lib/taxonomy.ts), and its products are dog and cat products
+ * too — so the tile links to the `pharmacyOnly` filter, which is the honest
+ * cross-species view, and takes its artwork from any product carrying a
+ * pharmacyCategory.
  */
 
 import Link from "next/link"

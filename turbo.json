@@ -20,6 +20,10 @@
     },
     "seed": {
       "outputs": []
+    },
+    "seed:catalog": {
+      "cache": false,
+      "outputs": []
     }
   }
 }
