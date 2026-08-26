@@ -39,10 +39,46 @@ for (const hostname of ["images.unsplash.com", "placehold.co"]) {
 
 const path = require("path")
 
+/*
+ * Same-origin proxy for the Medusa Store API.
+ *
+ * The browser used to call the backend host directly
+ * (https://<project>.up.railway.app/store/...), which quietly made every
+ * visitor's own DNS a dependency of the site working. A resolver that refuses
+ * or blocks that hostname — some mobile hotspots, corporate DNS, public Wi-Fi
+ * portals, ad-blocking resolvers, a few ISPs — produced a page that loaded
+ * perfectly and then showed zero products, because only the API calls failed.
+ * DNS_PROBE_FINISHED_BAD_CONFIG on the backend URL with the storefront itself
+ * loading fine is exactly that failure.
+ *
+ * Routing the API through this origin fixes it at the root: the only hostname
+ * the visitor has to resolve is the one that already served them the page, and
+ * Next resolves the backend host server-side, from Vercel, on a network we
+ * control. It also removes the cross-origin request entirely, so CORS and
+ * third-party-cookie policy stop being able to break the site.
+ *
+ * lib/api.ts sends browser traffic to /api/medusa and keeps the absolute URL
+ * for server-side calls, where a relative path cannot be fetched.
+ */
+const rewrites = async () => {
+  if (!backendUrl) {
+    // No backend configured (a bare `next build` in CI, say). Returning no
+    // rewrite is better than one pointing at undefined.
+    return []
+  }
+  return [
+    {
+      source: "/api/medusa/:path*",
+      destination: `${backendUrl.replace(/\/+$/, "")}/:path*`,
+    },
+  ]
+}
+
 /** @type {import('next').NextConfig} */
 module.exports = {
   reactStrictMode: true,
   images: { remotePatterns },
+  rewrites,
   // Pin the trace root to the monorepo. Without this, Next walks up past the
   // repo and picks a stray lockfile in the home directory as the workspace root.
   outputFileTracingRoot: path.join(__dirname, "../.."),

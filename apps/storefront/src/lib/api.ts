@@ -9,15 +9,37 @@
  *     is synchronous but is wrapped in the same async signatures so the calling
  *     code (contexts, screens) ports over unchanged.
  *   - Backend URL. The app sniffs the Expo dev-server LAN IP so a phone can
- *     reach the dev machine. A browser has no such problem, so the URL comes
- *     straight from NEXT_PUBLIC_MEDUSA_BACKEND_URL.
+ *     reach the dev machine. The browser goes through a same-origin proxy
+ *     instead — see API_BASE_URL below.
  */
 
 const stripTrailingSlash = (url: string) => url.replace(/\/+$/, "")
 
+/**
+ * Where the backend actually lives. Used for server-side calls, and as the
+ * rewrite target in next.config.js.
+ */
 export const MEDUSA_BACKEND_URL = stripTrailingSlash(
   process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
 )
+
+/**
+ * What the browser is told to call: a path on this origin, proxied to
+ * MEDUSA_BACKEND_URL by the rewrite in next.config.js.
+ *
+ * This is deliberate and load-bearing. Calling the backend host directly from
+ * the browser made the site depend on every visitor's DNS being willing to
+ * resolve that host — and when a resolver refuses it (some phone hotspots,
+ * captive-portal Wi-Fi, corporate or ad-blocking DNS), the page still loads and
+ * simply shows no products, which looks like a broken deployment rather than a
+ * network problem. Going through this origin means the only hostname the
+ * visitor resolves is the one that already served them the page.
+ *
+ * Server-side rendering keeps the absolute URL, because `fetch("/store/...")`
+ * has no origin to resolve against outside a browser.
+ */
+const API_BASE_URL =
+  typeof window === "undefined" ? MEDUSA_BACKEND_URL : "/api/medusa"
 
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 
@@ -101,7 +123,7 @@ export async function apiRequest<T>(
     headers["Authorization"] = `Bearer ${token}`
   }
 
-  const response = await fetch(`${MEDUSA_BACKEND_URL}${endpoint}`, {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
     cache: "no-store",
