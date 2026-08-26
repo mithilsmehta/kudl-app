@@ -33,9 +33,9 @@ export const categoryIds = (product: RecommendationCandidate): Set<string> =>
   new Set((product.categories ?? []).map((c) => c.id))
 
 /**
- * Brand affinity is a hook, not a real signal today: the seeded catalog has no
- * brand field. It reads `metadata.brand` so it activates automatically if that
- * field is ever added, without touching any strategy's scoring logic.
+ * Reads `metadata.brand`, stamped on every product by seed-kudl-merchandising.ts
+ * and seed-kudl-small-pets.ts (the same field the storefront's /products brand
+ * filter reads), so brand affinity and brand faceting stay in sync.
  */
 export const brandOf = (product: RecommendationCandidate): string | null => {
   const brand = product.metadata?.brand

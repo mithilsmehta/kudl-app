@@ -34,3 +34,22 @@ body {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
+
+/* Scroll-reveal and decorative blob motion are opt-out for anyone who asked
+   the OS to reduce motion — the content underneath is already fully visible
+   without them, so switching them off costs nothing. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-blob,
+  .animate-marquee {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* The brand ticker relies on the animation to reveal its second half —
+     without it, let people scroll to see the rest instead of hiding it. */
+  .marquee-viewport {
+    overflow-x: auto !important;
+  }
+}
+

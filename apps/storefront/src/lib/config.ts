@@ -27,7 +27,7 @@ export const FREE_DELIVERY_SUB = `Above ₹${FREE_DELIVERY_MIN_SUBTOTAL}`
 export const PET_THEMES: Record<string, { to: string; tagline: string }> = {
   Dogs: { to: "#1e40af", tagline: "Food, toys & care" },
   Cats: { to: "#d97706", tagline: "Treats & essentials" },
-  "Small Pets": { to: "#047857", tagline: "Birds, fish & more" },
+  Pharmacy: { to: "#047857", tagline: "Vet-trusted care" },
 }
 
 export const PET_THEME_FALLBACK = { to: "#4b5563", tagline: "Explore range" }
