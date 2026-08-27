@@ -95,6 +95,13 @@ services:
       S3_REGION: ${S3_REGION:-}
       S3_FILE_URL: ${S3_FILE_URL:-}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
+      # Only for a legacy bucket that uses object ACLs; see medusa-config.ts.
+      S3_ACL: ${S3_ACL:-}
+
+      # Public origin of this backend. Used by the local file provider to build
+      # image URLs; without it they default to http://localhost:9000/static and
+      # every uploaded image renders broken. Also set this on Railway.
+      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
 
       # The shared team login, created automatically on first boot.
       # Razorpay. Absent values leave the provider unregistered, so a developer

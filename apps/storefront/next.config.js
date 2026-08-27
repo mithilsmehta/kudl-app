@@ -20,12 +20,20 @@ if (backendUrl) {
   }
 }
 
-if (process.env.MEDUSA_IMAGE_HOSTNAME) {
-  remotePatterns.push({
-    protocol: "https",
-    hostname: process.env.MEDUSA_IMAGE_HOSTNAME,
-    pathname: "/**",
-  })
+/*
+ * Hosts that serve uploaded product images. next/image refuses any host that is
+ * not listed here, so an image uploaded through Medusa Admin renders as a broken
+ * placeholder until its host is allowed — which looks identical to a storage
+ * misconfiguration.
+ *
+ * Comma-separated so a bucket host and a CDN/custom domain in front of it can
+ * both be allowed, e.g.
+ *   MEDUSA_IMAGE_HOSTNAME=kudl-media.s3.ap-south-1.amazonaws.com,cdn.kudl.com
+ */
+for (const raw of (process.env.MEDUSA_IMAGE_HOSTNAME || "").split(",")) {
+  const hostname = raw.trim()
+  if (!hostname) continue
+  remotePatterns.push({ protocol: "https", hostname, pathname: "/**" })
 }
 
 /*

@@ -35,7 +35,39 @@ const REDIS_URL = process.env.REDIS_URL;
  *     the S3_* vars unset. Single replica only.
  */
 const S3_BUCKET = process.env.S3_BUCKET;
-const useS3 = Boolean(S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY);
+
+/*
+ * S3_FILE_URL is in this guard on purpose. The provider builds every public
+ * image URL as `${file_url}/${key}` — so with the bucket and keys set but
+ * S3_FILE_URL missing, uploads succeed and Medusa stores URLs that literally
+ * begin "undefined/". That renders as a broken image in both the admin and the
+ * storefront and looks exactly like a storage misconfiguration, which is a
+ * miserable thing to debug. Better to fall back to local storage, which at
+ * least fails honestly and loudly on the next redeploy.
+ */
+const useS3 = Boolean(
+  S3_BUCKET &&
+    process.env.S3_ACCESS_KEY_ID &&
+    process.env.S3_SECRET_ACCESS_KEY &&
+    process.env.S3_FILE_URL
+);
+
+/*
+ * Object ACLs. The provider defaults to sending ACL: "public-read" on every
+ * public upload, and that default is wrong for most buckets you would create
+ * today:
+ *
+ *   - AWS S3 buckets created since April 2023 default to Object Ownership =
+ *     "Bucket owner enforced", which REJECTS any PutObject carrying an ACL with
+ *     AccessControlListNotSupported. The upload fails outright.
+ *   - Cloudflare R2 does not implement object ACLs at all.
+ *
+ * So the default here is to send no ACL header, and to make objects readable
+ * through a bucket policy (S3) or public bucket access / a custom domain (R2)
+ * instead. Set S3_ACL=public-read only for a legacy bucket that genuinely uses
+ * object ACLs.
+ */
+const S3_ACL = process.env.S3_ACL;
 
 /*
  * Every entry needs an explicit `key`. Medusa resolves a module's registration name
@@ -70,6 +102,18 @@ const redisModules = REDIS_URL
     ]
   : [];
 
+/**
+ * Public origin of this backend, e.g. https://kudl-app-production.up.railway.app
+ *
+ * Required by the local file provider, and the reason uploaded images break on a
+ * deployed backend even before you hit the ephemeral-disk problem: the provider
+ * defaults `backend_url` to "http://localhost:9000/static", so every uploaded
+ * file is stored in the database with a localhost URL. The admin and the
+ * storefront then both render it as a broken image, on every machine, forever —
+ * the file is on disk and fine, the URL pointing at it is not.
+ */
+const MEDUSA_BACKEND_URL = (process.env.MEDUSA_BACKEND_URL || 'http://localhost:9000').replace(/\/+$/, '');
+
 const fileModules = useS3
   ? [
       {
@@ -88,13 +132,46 @@ const fileModules = useS3
                 bucket: S3_BUCKET,
                 // Required for Cloudflare R2 and other non-AWS S3 endpoints.
                 ...(process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT } : {}),
+                // `false` makes the provider omit the ACL header entirely. See
+                // the S3_ACL note above — this is the safe default for modern
+                // AWS buckets and for R2.
+                acl: S3_ACL ? S3_ACL : false,
               },
             },
           ],
         },
       },
     ]
-  : [];
+  : [
+      /*
+       * No bucket configured: use the local provider, but point it at this
+       * backend's real public origin instead of the localhost default.
+       *
+       * This is a legitimate setup for a small single-replica store, but only
+       * when ./static is a MOUNTED DISK — a Railway Volume mounted at
+       * /app/static. Without the volume the container's filesystem is
+       * ephemeral and every uploaded image 404s at the next deploy, which is
+       * exactly the failure this whole module exists to avoid.
+       */
+      {
+        key: Modules.FILE,
+        resolve: '@medusajs/file',
+        options: {
+          providers: [
+            {
+              resolve: '@medusajs/file-local',
+              id: 'local',
+              options: {
+                // upload_dir is left at its default (<cwd>/static, i.e.
+                // /app/static in the Docker image) so a Railway Volume mounted
+                // there is picked up with no further configuration.
+                backend_url: `${MEDUSA_BACKEND_URL}/static`,
+              },
+            },
+          ],
+        },
+      },
+    ];
 
 /*
  * Razorpay. Registered only when credentials are present, so a developer without
