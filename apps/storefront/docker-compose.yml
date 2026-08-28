@@ -1,0 +1,97 @@
+# KUDL storefront — the Next.js website.
+#
+# Run from THIS directory (apps/storefront):
+#
+#   docker compose up -d --build     start
+#   docker compose logs -f           watch it
+#   docker compose down              stop
+#
+# ┌───────────────────────────────────────────────────────────────────────────┐
+# │  START THE BACKEND FIRST.                                                 │
+# │                                                                           │
+# │    cd ../backend && docker compose up -d                                  │
+# │                                                                           │
+# │  This stack has no database and no network of its own — it attaches to    │
+# │  the network the backend stack creates. Start it first and you get:       │
+# │                                                                           │
+# │    network kudl-demo_default declared as external, but could not be found │
+# │                                                                           │
+# │  which means exactly that: the backend is not running yet.                │
+# └───────────────────────────────────────────────────────────────────────────┘
+#
+# Configuration comes from apps/storefront/.env. Copy .env.template to .env first.
+# Several of these values are shared with the backend stack and must MATCH the
+# ones in apps/backend/.env — see the note on each.
+
+# A separate project from the backend's `kudl-demo` on purpose. Sharing the name
+# would make `docker compose up` here believe the backend services are orphans of
+# this file and offer to remove them.
+name: kudl-storefront
+
+services:
+  storefront:
+    # Named explicitly. Without this, compose tags the image <project>-<service>,
+    # which here would be the stuttering "kudl-storefront-storefront".
+    image: kudl-storefront
+    build:
+      # The repo ROOT, two levels up — not this directory. This is an
+      # npm-workspace monorepo: the lockfile and hoisted node_modules live at the
+      # root, and .dockerignore is read from there too.
+      context: ../..
+      dockerfile: apps/storefront/Dockerfile
+      # Build args, not environment. NEXT_PUBLIC_* values are compiled into the
+      # browser bundle when the image is BUILT and are not read at container
+      # start, and Next bakes the /api/medusa rewrite destination into the build
+      # as well. Change any of these and you must rebuild:
+      #   docker compose up -d --build
+      # A plain restart keeps serving the old values.
+      args:
+        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
+        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${MEDUSA_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+        MEDUSA_IMAGE_HOSTNAME: ${MEDUSA_IMAGE_HOSTNAME:-}
+        # "backend" is the service name in apps/backend/docker-compose.yml, which
+        # is also its hostname on the shared network below.
+        MEDUSA_BACKEND_INTERNAL_URL: http://backend:9000
+    restart: unless-stopped
+    # No depends_on: the backend is a different compose project, so this file
+    # cannot express the dependency. The external network below enforces the
+    # ordering instead — this stack will not start until the backend has created it.
+    environment:
+      NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
+      NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${MEDUSA_PUBLISHABLE_KEY:-}
+      # Read at runtime, server-side only. Server-rendered pages use this, so they
+      # talk to the backend across the Docker network rather than hairpinning out
+      # through the public address and back in.
+      MEDUSA_BACKEND_INTERNAL_URL: http://backend:9000
+    ports:
+      # Loopback by default, so behind Traefik this port is not reachable from the
+      # internet. Set BIND_ADDRESS=0.0.0.0 to publish it openly — which is what
+      # you want on a server with an IP but no domain yet.
+      - "${BIND_ADDRESS:-127.0.0.1}:${STOREFRONT_PORT:-8000}:3000"
+    labels:
+      # Traefik runs in the BACKEND stack, but finds this container anyway: it
+      # discovers services through the Docker socket, not through compose, so a
+      # different project is no obstacle as long as the container sits on the
+      # network it watches (it does) and opts in here.
+      - traefik.enable=true
+      # Matches the bare domain and www. Add or remove hosts here rather than
+      # introducing a second router — one router per service keeps the
+      # certificate resolver simple.
+      - traefik.http.routers.storefront.rule=Host(`${STOREFRONT_DOMAIN:-kudl.localhost}`) || Host(`www.${STOREFRONT_DOMAIN:-kudl.localhost}`)
+      - traefik.http.routers.storefront.entrypoints=websecure
+      - traefik.http.routers.storefront.tls.certresolver=le
+      # Traefik talks to the container port, not the published one.
+      - traefik.http.services.storefront.loadbalancer.server.port=3000
+
+networks:
+  # Join the backend stack's network instead of creating one. This is what lets
+  # the storefront resolve `backend` by name, and what lets Traefik route here.
+  #
+  # `external: true` means compose will NOT create it — the backend stack owns it.
+  # That is deliberate: it makes the start order explicit and fails loudly rather
+  # than silently building a second, isolated network where nothing can find the
+  # backend.
+  default:
+    name: kudl-demo_default
+    external: true

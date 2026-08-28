@@ -8,8 +8,8 @@ loadEnv(process.env.NODE_ENV || 'development', process.cwd());
 // back to /app/login because no session was ever stored.
 //
 // Set COOKIE_SECURE=false when the dashboard is served over http:// (local Docker, a
-// LAN host). Leave it UNSET anywhere served over https:// — including Railway — so
-// the cookie stays Secure.
+// LAN host). Leave it UNSET anywhere served over https:// — behind a reverse proxy
+// holding a TLS certificate — so the cookie stays Secure.
 const insecureCookies = process.env.COOKIE_SECURE === 'false';
 
 /**
@@ -31,8 +31,8 @@ const REDIS_URL = process.env.REDIS_URL;
  * Two supported deployments:
  *   - S3-compatible (AWS S3, Cloudflare R2): set the S3_* vars below. Preferred for
  *     anything real, and required if the service ever runs more than one replica.
- *   - Local provider on a mounted disk (e.g. a Railway Volume at /app/static): leave
- *     the S3_* vars unset. Single replica only.
+ *   - Local provider on a mounted disk (the `medusa-static` Docker volume, mounted
+ *     at /app/static): leave the S3_* vars unset. Single replica only.
  */
 const S3_BUCKET = process.env.S3_BUCKET;
 
@@ -46,10 +46,7 @@ const S3_BUCKET = process.env.S3_BUCKET;
  * least fails honestly and loudly on the next redeploy.
  */
 const useS3 = Boolean(
-  S3_BUCKET &&
-    process.env.S3_ACCESS_KEY_ID &&
-    process.env.S3_SECRET_ACCESS_KEY &&
-    process.env.S3_FILE_URL
+  S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY && process.env.S3_FILE_URL,
 );
 
 /*
@@ -95,15 +92,27 @@ const redisModules = REDIS_URL
       {
         key: Modules.WORKFLOW_ENGINE,
         resolve: '@medusajs/workflow-engine-redis',
-        // `redisUrl`, not `redis: { url }` — the latter still works but the module
-        // logs "The `url` option is deprecated" on every boot.
-        options: { redisUrl: REDIS_URL },
+        /*
+         * NESTED under `redis`, unlike the two modules above.
+         *
+         * cache-redis and event-bus-redis take a flat `redisUrl`. This one does
+         * not: its loader destructures straight out of `options.redis`, so a flat
+         * `redisUrl` leaves that undefined and the whole module dies at boot with
+         *
+         *   Loaders for module Workflows failed: Cannot destructure property
+         *   'url' of '(intermediate value)' as it is undefined
+         *
+         * The inner key is `redisUrl` rather than the older `url`, which still
+         * works but logs a deprecation warning on every boot.
+         */
+        options: { redis: { redisUrl: REDIS_URL } },
       },
     ]
   : [];
 
 /**
- * Public origin of this backend, e.g. https://kudl-app-production.up.railway.app
+ * Public origin of this backend, e.g. https://api.kudl.in — or http://<server-ip>:9000
+ * before a domain is pointed at the server.
  *
  * Required by the local file provider, and the reason uploaded images break on a
  * deployed backend even before you hit the ephemeral-disk problem: the provider
@@ -148,10 +157,11 @@ const fileModules = useS3
        * backend's real public origin instead of the localhost default.
        *
        * This is a legitimate setup for a small single-replica store, but only
-       * when ./static is a MOUNTED DISK — a Railway Volume mounted at
-       * /app/static. Without the volume the container's filesystem is
-       * ephemeral and every uploaded image 404s at the next deploy, which is
-       * exactly the failure this whole module exists to avoid.
+       * when ./static is a MOUNTED VOLUME — the `medusa-static` volume declared
+       * in docker-compose.yml, mounted at /app/static. Without it the
+       * container's filesystem is ephemeral and every uploaded image 404s the
+       * next time the image is rebuilt, which is exactly the failure this whole
+       * module exists to avoid.
        */
       {
         key: Modules.FILE,
@@ -163,8 +173,9 @@ const fileModules = useS3
               id: 'local',
               options: {
                 // upload_dir is left at its default (<cwd>/static, i.e.
-                // /app/static in the Docker image) so a Railway Volume mounted
-                // there is picked up with no further configuration.
+                // /app/static in the Docker image) so the `medusa-static`
+                // volume mounted there is picked up with no further
+                // configuration.
                 backend_url: `${MEDUSA_BACKEND_URL}/static`,
               },
             },
@@ -212,10 +223,7 @@ const paymentModules = useRazorpay
 // above, they have no optional external dependency).
 //   - recommendation: activity events, related-products scoring config
 //   - pet: customer pet profiles collected by the storefront onboarding flow
-const customModules = [
-  { resolve: './src/modules/recommendation' },
-  { resolve: './src/modules/pet' },
-];
+const customModules = [{ resolve: './src/modules/recommendation' }, { resolve: './src/modules/pet' }];
 
 const modules = [...redisModules, ...fileModules, ...paymentModules, ...customModules];
 

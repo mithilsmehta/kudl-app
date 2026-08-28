@@ -38,8 +38,23 @@ export const MEDUSA_BACKEND_URL = stripTrailingSlash(
  * Server-side rendering keeps the absolute URL, because `fetch("/store/...")`
  * has no origin to resolve against outside a browser.
  */
+/**
+ * Where the server process reaches the backend. Inside the Docker network that is
+ * http://backend:9000 — a request that never leaves the host, instead of hairpinning
+ * out through the public address and back in. Unset outside containers, where it
+ * correctly falls back to the public URL.
+ *
+ * Not a NEXT_PUBLIC_ var on purpose: the internal hostname is meaningless to a
+ * browser and must not be inlined into the client bundle.
+ */
+const SERVER_BACKEND_URL = stripTrailingSlash(
+  process.env.MEDUSA_BACKEND_INTERNAL_URL ||
+    process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL ||
+    "http://localhost:9000"
+)
+
 const API_BASE_URL =
-  typeof window === "undefined" ? MEDUSA_BACKEND_URL : "/api/medusa"
+  typeof window === "undefined" ? SERVER_BACKEND_URL : "/api/medusa"
 
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 

@@ -1,22 +1,46 @@
-# Backend stack: Postgres + Medusa. Run from this directory (apps/backend):
+# KUDL backend stack — Postgres, Redis, Traefik and Medusa.
 #
-#   docker compose up -d --build      start everything
-#   docker compose logs -f medusa     watch the backend (prints the publishable key on boot)
-#   docker compose down               stop (database is kept in the named volume)
-#   docker compose down -v            stop AND delete the database
+# Run from THIS directory (apps/backend):
 #
-# Configuration comes from apps/backend/.env — the same file the non-Docker setup uses.
-# Copy .env.template to .env and fill it in before the first run.
+#   docker compose up -d --build       start (no HTTPS, direct ports)
+#   docker compose --profile proxy up -d --build
+#                                      start with Traefik on :80/:443 + HTTPS
+#   docker compose logs -f backend     watch the backend; prints the publishable key
+#   docker compose ps                  what is running
+#   docker compose down                stop. THE DATABASE IS KEPT.
 #
-# The mobile app is NOT containerised: Docker has no phone or simulator, and iOS builds
-# require macOS + Xcode. Run it directly with `npx expo start` from apps/mobile.
+# START THIS BEFORE THE STOREFRONT. The storefront stack
+# (apps/storefront/docker-compose.yml) attaches to the network this file creates,
+# and will refuse to start with "network kudl-demo_default not found" if this one
+# is not already up.
+#
+# Configuration comes from apps/backend/.env — the same file the native
+# (non-Docker) `npm run backend:dev` uses. Copy .env.template to .env first.
+#
+# ┌───────────────────────────────────────────────────────────────────────────┐
+# │  NEVER run `docker compose down -v`.                                      │
+# │                                                                           │
+# │  The -v flag deletes named volumes, which means the entire store — every  │
+# │  product, customer and order. Plain `down` stops the containers and       │
+# │  leaves the data alone, which is what you almost always want.             │
+# └───────────────────────────────────────────────────────────────────────────┘
+#
+# The mobile app is not here. Docker has no phone or simulator, and iOS builds
+# need macOS and Xcode, so it runs directly with `npx expo start` from apps/mobile.
 
-# Pinned so the project (and therefore the postgres-data volume) keeps a stable name
-# regardless of which directory compose is invoked from. Changing this orphans the
-# database volume.
+# Pinned so the project — and therefore the postgres-data volume and the network
+# the storefront attaches to — keeps a stable name regardless of the directory
+# compose is invoked from.
+#
+# DO NOT CHANGE THIS. The existing database lives in the Docker volume
+# `kudl-demo_postgres-data`, and that name is derived from this line. Rename the
+# project and compose creates a brand-new empty volume, silently leaving the real
+# store orphaned and the site looking freshly installed. It would also break the
+# storefront, which joins `kudl-demo_default` by name.
 name: kudl-demo
 
 services:
+  # ---------------------------------------------------------------- database ----
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -26,94 +50,218 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-medusa-backend}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    # Exposed so you can point psql / TablePlus at it from the host.
-    # NOTE: nothing else may hold host port 5432 — stop a native Postgres first
-    # (macOS: brew services stop postgresql@16). Set POSTGRES_PORT to run alongside one.
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Not published to the host by default. On a public server an exposed 5432 is
+    # a standing invitation, and nothing outside this network needs it — the
+    # backend reaches Postgres over the compose network by service name.
+    #
+    # To connect psql or TablePlus from your own machine, prefer an SSH tunnel:
+    #   ssh -L 5432:localhost:5432 user@server
+    # Or, for local development only, uncomment:
+    # ports:
+    #   - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medusa} -d ${POSTGRES_DB:-medusa-backend}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  medusa:
+  # ------------------------------------------------------------------- redis ----
+  # Without Redis, Medusa falls back to an in-memory event bus, cache and workflow
+  # engine — it logs "a fake redis instance will be used" and "not recommended for
+  # production" on every boot. In that state every queued job, subscriber and
+  # long-running workflow is lost whenever the container restarts, which on a
+  # server that restarts on each deploy means losing them routinely.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # appendonly keeps the queue across a restart rather than starting empty.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ----------------------------------------------------------------- traefik ----
+  # Edge router: the single thing listening on :80 and :443, terminating HTTPS and
+  # forwarding to the right container by hostname.
+  #
+  # It lives in the backend stack because it has to live somewhere, and this stack
+  # owns the shared infrastructure. It routes to the STOREFRONT too — Traefik
+  # discovers containers through the Docker socket, so it finds the storefront
+  # even though that runs as a separate compose project, as long as the storefront
+  # is attached to this stack's network (it is) and carries traefik labels (it does).
+  #
+  # OPT-IN, behind a compose profile:
+  #
+  #   docker compose up -d                    no Traefik. Services publish their
+  #                                           own ports. Use locally, and on a
+  #                                           server with an IP but no domain yet.
+  #
+  #   docker compose --profile proxy up -d    Traefik on :80/:443 with automatic
+  #                                           Let's Encrypt certificates. Needs
+  #                                           DNS pointed at this server FIRST.
+  #
+  # Why Traefik rather than hand-written nginx: it reads the labels on the services
+  # and configures itself, so there is no nginx.conf to keep in step, and it issues
+  # and renews certificates without a cron job.
+  traefik:
+    image: traefik:v3.3
+    profiles: ["proxy"]
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      # Nothing is exposed unless it opts in with `traefik.enable=true`. Without
+      # this, Traefik would happily publish Postgres and Redis to the internet.
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.network=kudl-demo_default
+
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+
+      # Everything on :80 is redirected to :443. A store that accepts plain http
+      # is a store that leaks session cookies.
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+
+      # Let's Encrypt over the HTTP-01 challenge. Requires port 80 reachable from
+      # the internet and the domains already resolving to this server —
+      # issuance fails otherwise, and Let's Encrypt rate-limits repeated
+      # failures, so get DNS right before the first `up`.
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:-admin@kudl.com}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+
+      - --log.level=INFO
+      - --accesslog=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Read-only, and still the most sensitive line in this file: anything that
+      # can talk to the Docker socket can control the host's containers. Traefik
+      # needs it to discover services.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Issued certificates, on a named volume so they survive a rebuild. Losing
+      # them means re-requesting from Let's Encrypt and burning rate limit.
+      - traefik-acme:/letsencrypt
+
+  # ----------------------------------------------------------------- backend ----
+  # Medusa: the Store API, the Admin dashboard at /app, and every custom route.
+  backend:
+    # Named explicitly so it does not inherit the compose project name, which
+    # would tag it "kudl-demo-backend" and read as if the project were a demo.
+    image: kudl-backend
     build:
-      # Build context is the REPO ROOT (two levels up): this is an npm-workspace
-      # monorepo, so the lockfile and hoisted dependencies live there.
+      # The repo ROOT, two levels up — not this directory. This is an npm-workspace
+      # monorepo: the lockfile and hoisted node_modules live at the root, and
+      # .dockerignore is read from there too.
       context: ../..
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      # sslmode matters: Medusa's database driver attempts an SSL handshake by default,
-      # which hangs against this plain Postgres container until the connection pool times
-      # out ("Knex: Timeout acquiring a connection"). "disable" is correct for a container
-      # on a private Docker network. Set DATABASE_SSLMODE=require for a managed Postgres
-      # (RDS, Neon, Supabase) that mandates TLS.
+      # sslmode matters: Medusa's database driver attempts an SSL handshake by
+      # default, which hangs against this plain Postgres container until the pool
+      # times out ("Knex: Timeout acquiring a connection"). "disable" is correct
+      # for a container on a private Docker network. Use require for a managed
+      # Postgres that mandates TLS.
       DATABASE_URL: postgres://${POSTGRES_USER:-medusa}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medusa-backend}?sslmode=${DATABASE_SSLMODE:-disable}
+      REDIS_URL: redis://redis:6379
 
       # Must be real random values on anything reachable from the internet.
+      #   openssl rand -base64 32
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET is required}
 
       # The image runs with NODE_ENV=production, which makes Medusa mark the admin
-      # session cookie Secure. Browsers drop Secure cookies over plain http://, so the
-      # dashboard would log in and bounce straight back to the login page. Keep "false"
-      # while serving over http; set "true" once the dashboard is behind HTTPS.
+      # session cookie Secure. Browsers drop Secure cookies over plain http://, so
+      # the dashboard would log in and bounce straight back to the login page.
+      # Keep "false" while serving over http; set "true" once behind HTTPS.
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
 
-      # Browser origins allowed to call the API. The mobile app is unaffected by
-      # these (React Native is not subject to CORS).
+      # Browser origins allowed to call the API. The mobile app is unaffected —
+      # React Native is not subject to CORS.
       #
       # Medusa applies these per route group, so they are NOT interchangeable:
       #   STORE_CORS -> /store/*  (products, carts, orders)
-      #   ADMIN_CORS -> /admin/*  (the dashboard at :9000/app)
-      #   AUTH_CORS  -> /auth/*   (customer AND admin login/register)
+      #   ADMIN_CORS -> /admin/*  (the dashboard)
+      #   AUTH_CORS  -> /auth/*   (customer AND admin sign-in)
       #
-      # AUTH_CORS must therefore list the storefront origin as well as the
-      # dashboard's. Omitting the storefront lets products and carts load while
-      # every sign-in fails in the browser with "Failed to fetch" — the response
-      # comes back without an Access-Control-Allow-Origin header and is discarded.
+      # AUTH_CORS must list the storefront origin as well as the dashboard's.
+      # Omitting the storefront lets products and carts load while every sign-in
+      # fails in the browser with "Failed to fetch" — the response comes back with
+      # no Access-Control-Allow-Origin header and is discarded.
       STORE_CORS: ${STORE_CORS:-http://localhost:8000}
       ADMIN_CORS: ${ADMIN_CORS:-http://localhost:9000}
       AUTH_CORS: ${AUTH_CORS:-http://localhost:8000,http://localhost:9000}
 
-      # Optional locally: with no Redis service in this compose file the variable is
-      # empty, and Medusa falls back to its in-memory event bus, cache and workflow
-      # engine. Set REDIS_URL in .env (and run a Redis container on this network) to
-      # exercise the same wiring a deployed environment uses.
-      REDIS_URL: ${REDIS_URL:-}
+      # Public origin of this backend. Used by the local file provider to build
+      # image URLs; without it they default to http://localhost:9000/static and
+      # every uploaded image renders broken for everyone but you.
+      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
 
-      # S3-compatible file storage. All three of bucket/key/secret must be present or
-      # medusa-config.ts leaves the S3 provider off and uses the local ./static path.
+      # S3-compatible storage. All four must be present or medusa-config.ts leaves
+      # the S3 provider off and uses the medusa-static volume below.
       S3_BUCKET: ${S3_BUCKET:-}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       S3_REGION: ${S3_REGION:-}
       S3_FILE_URL: ${S3_FILE_URL:-}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
-      # Only for a legacy bucket that uses object ACLs; see medusa-config.ts.
       S3_ACL: ${S3_ACL:-}
 
-      # Public origin of this backend. Used by the local file provider to build
-      # image URLs; without it they default to http://localhost:9000/static and
-      # every uploaded image renders broken. Also set this on Railway.
-      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-http://localhost:9000}
-
-      # The shared team login, created automatically on first boot.
-      # Razorpay. Absent values leave the provider unregistered, so a developer
-      # without credentials still gets a bootable backend.
+      # Razorpay. Absent values leave the provider unregistered, so the stack
+      # still boots for someone without credentials.
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
 
+      # Turn on only in the same change that wires up one-time-code delivery. With
+      # nothing sending codes, "true" locks every customer out of changing their
+      # email. See src/lib/customer-email-change.ts.
+      EMAIL_CHANGE_OTP_ENABLED: ${EMAIL_CHANGE_OTP_ENABLED:-false}
+
+      # The shared admin login, created automatically on first boot.
       MEDUSA_ADMIN_EMAIL: ${MEDUSA_ADMIN_EMAIL:-admin@kudl.com}
       MEDUSA_ADMIN_PASSWORD: ${MEDUSA_ADMIN_PASSWORD:?MEDUSA_ADMIN_PASSWORD is required}
+    volumes:
+      # Uploaded images, when no S3 bucket is configured. Without this volume the
+      # container filesystem is ephemeral and every uploaded image 404s the next
+      # time the image is rebuilt.
+      - medusa-static:/app/static
     ports:
-      - "${MEDUSA_PORT:-9000}:9000"
+      # Bound to loopback by default, so on a public server the backend is NOT
+      # directly reachable — traffic arrives through Traefik, or through an SSH
+      # tunnel for debugging. Set BIND_ADDRESS=0.0.0.0 in .env to publish it
+      # openly, which is what you want on a server with an IP and no domain yet.
+      - "${BIND_ADDRESS:-127.0.0.1}:${MEDUSA_PORT:-9000}:9000"
+    labels:
+      # Ignored entirely unless Traefik is running (--profile proxy).
+      - traefik.enable=true
+      # The backend needs its own public hostname even though the storefront
+      # proxies /api/medusa server-side, because three other things reach it
+      # directly: the mobile app, the Admin dashboard at /app, and Razorpay's
+      # webhook callback.
+      - traefik.http.routers.backend.rule=Host(`${BACKEND_DOMAIN:-api.kudl.localhost}`)
+      - traefik.http.routers.backend.entrypoints=websecure
+      - traefik.http.routers.backend.tls.certresolver=le
+      # Traefik talks to the container port, not the published one.
+      - traefik.http.services.backend.loadbalancer.server.port=9000
 
 volumes:
+  # The store. Named exactly as before so the existing kudl-demo_postgres-data
+  # volume is picked up rather than replaced.
   postgres-data:
+  redis-data:
+  medusa-static:
+  # Let's Encrypt certificates. Only used with --profile proxy.
+  traefik-acme:

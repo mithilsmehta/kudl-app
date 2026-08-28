@@ -60,30 +60,31 @@ run_seed() {
 }
 
 if [ "$PRODUCT_COUNT" = "0" ]; then
-  log "Catalogue is empty - seeding KUDL pets data..."
+  # Two scripts, in this order, and BOTH are required for a usable store.
+  #
+  # seed-kudl-pets builds the India infrastructure only — currency, region, tax
+  # region, stock location, fulfilment and shipping options. It creates no
+  # products at all; its own closing log line says to run the catalog next.
+  log "Catalogue is empty - seeding KUDL India infrastructure..."
   run_seed seed-kudl-pets
-  # Small Pets is a separate script so it can be applied to an already-seeded
-  # store. On a fresh database it has to run too, or the category the clients
-  # render a tile for simply would not exist.
-  log "Seeding Small Pets range..."
-  run_seed seed-kudl-small-pets
-  # Only on a fresh catalogue: both clients advertise KUDLFREE1000 in their homepage
-  # copy, so a brand-new store needs it to exist or it ships a broken promise.
-  log "Seeding KUDL promotions..."
-  run_seed seed-kudl-promotions
+
+  # seed-kudl-catalog is what actually fills the shop: the category tree and the
+  # products. Without it a fresh install comes up with a working checkout and an
+  # empty storefront, which reads as a broken deployment.
+  log "Seeding KUDL catalogue (categories + products)..."
+  run_seed seed-kudl-catalog
 else
   log "Catalogue already has $PRODUCT_COUNT products - skipping product seed."
 fi
 
-# NOTE: the promotions seed deliberately does NOT run here.
+# Seeding is guarded on the product count rather than run unconditionally, and that
+# guard is the point: a seed that runs on every boot cannot tell "never existed"
+# from "deliberately deleted", so a product removed in Medusa Admin would come
+# straight back on the next deploy. Guarded this way, deletions stick — and an
+# existing store is never touched.
 #
-# It used to run on every boot, which meant a coupon deleted in the dashboard came
-# straight back on the next deploy — the seed cannot tell "never existed" from
-# "deliberately removed". Promotions are now seeded only alongside a fresh catalogue
-# (see the PRODUCT_COUNT branch above), so deleting one in Medusa Admin sticks.
-#
-# To add promotions to an existing store, run it explicitly:
-#   npx medusa exec ./src/scripts/seed-kudl-promotions.js
+# To re-run the catalogue by hand on a store that already has products:
+#   docker compose exec backend npx medusa exec ./src/scripts/seed-kudl-catalog.js
 
 # ---- 4. Shared admin user ------------------------------------------------------
 # Every environment gets the same login, so the whole team signs in identically.

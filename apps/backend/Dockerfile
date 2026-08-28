@@ -65,6 +65,6 @@ EXPOSE 9000
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 # `medusa start -p` defaults to the literal string "9000" and does NOT read the PORT
-# env var, so a platform that injects a random port (Railway, Render, Fly) would never
-# pass its health check. Honour PORT when present, fall back to 9000 locally.
+# env var. Honouring PORT here keeps the port configurable from compose without
+# rebuilding the image; it falls back to 9000, which is what the stack uses.
 CMD ["sh", "-c", "npx medusa start -H 0.0.0.0 -p ${PORT:-9000}"]

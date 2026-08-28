@@ -50,9 +50,6 @@ yarn-error.log*
 .turbo
 .vscode
 
-# vercel
-.vercel
-
 # macOS system files
 .DS_Store
 .DS_Store?
@@ -66,3 +63,10 @@ Thumbs.db
 # Medusa's local file provider writes uploads here (see the fileModules block in
 # apps/backend/medusa-config.ts). Local dev artefacts, never source.
 apps/backend/static/
+
+# Database exports. A dump holds every customer's name, email, phone number and
+# delivery address — it must never be committed. Ignored as a directory AND by
+# extension, so a dump written somewhere else by mistake is still caught.
+backups/
+*.sql
+*.dump

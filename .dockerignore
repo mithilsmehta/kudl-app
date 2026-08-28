@@ -1,4 +1,11 @@
 # Keep the build context small and never ship secrets or host-built artifacts.
+#
+# THIS FILE MUST STAY AT THE REPO ROOT, even though the compose files now live in
+# apps/backend and apps/storefront. Docker reads .dockerignore from the BUILD
+# CONTEXT root, and both Dockerfiles use the repo root as their context (npm
+# workspace: the lockfile and hoisted node_modules are here). Move it into an app
+# folder and it is silently ignored — node_modules gets copied into every build,
+# which makes them enormous and slow.
 **/node_modules
 **/.medusa
 **/dist
@@ -13,12 +20,14 @@
 !**/.env.template
 !**/.env.example
 
-# The mobile app is not part of the backend image (you cannot run a phone app in a
-# container). It is distributed via Expo/EAS instead.
+# The mobile app is in neither image — you cannot run a phone app in a container.
+# It is distributed via Expo/EAS instead.
 apps/mobile
 
 .git
 .gitignore
 **/*.log
 **/.DS_Store
-docker-compose.yml
+
+# Compose config is read by the Docker CLI on the host, never by a build.
+**/docker-compose.yml

@@ -6,9 +6,10 @@
  *
  * The @medusajs/prices-in-major-units rule assumes any 3-4 digit integer is a
  * minor-unit mistake, which is wrong for rupee pricing where every realistic
- * price looks like that. Disabled here with intent — do NOT divide these by 100.
+ * price looks like that. The rule no longer fires on this file, so the
+ * eslint-disable it used to carry has gone — but the intent stands: do NOT
+ * divide these by 100.
  */
-/* eslint-disable @medusajs/prices-in-major-units */
 import { MedusaContainer } from "@medusajs/framework"
 import {
   MedusaError,
