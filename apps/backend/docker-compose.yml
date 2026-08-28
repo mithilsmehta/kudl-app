@@ -225,6 +225,12 @@ services:
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
 
+      # Brevo, for the signup verification code. Left blank, the backend logs the
+      # code instead of emailing it — see src/lib/brevo.ts.
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-}
+      BREVO_SENDER_NAME: ${BREVO_SENDER_NAME:-KUDL Pet Store}
+
       # Turn on only in the same change that wires up one-time-code delivery. With
       # nothing sending codes, "true" locks every customer out of changing their
       # email. See src/lib/customer-email-change.ts.

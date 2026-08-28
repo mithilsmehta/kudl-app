@@ -233,34 +233,66 @@ export const loginCustomer = async (
   return data;
 };
 
+export interface SignupOtpRequest {
+  email: string;
+  expires_at: string;
+  expires_in_minutes: number;
+  resend_after_seconds: number;
+  /**
+   * False when the backend has no Brevo credentials, in which case the code was
+   * printed to the backend log instead of emailed. The screen shows a visible
+   * development notice rather than telling someone to check an empty inbox.
+   */
+  email_sent: boolean;
+}
+
+/**
+ * Step one of signup: ask for a code to be emailed.
+ *
+ * Creates nothing. An abandoned signup leaves no half-made account behind — the
+ * account only exists once registerCustomer below succeeds.
+ */
+export const requestSignupOtp = async (email: string): Promise<SignupOtpRequest> => {
+  return apiRequest<SignupOtpRequest>('/store/signup/request-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+};
+
+/**
+ * Step two of signup: submit the code and create the account.
+ *
+ * One backend call replaces the three this used to make. Verification and account
+ * creation happen together server-side, which is the point — separate calls would
+ * let a client skip verification and register anyway, since Medusa's own register
+ * route knows nothing about our codes.
+ *
+ * The login afterwards is still a separate call: the backend deliberately does not
+ * mint a token, so this reuses the existing, well-tested sign-in path.
+ */
 export const registerCustomer = async (details: {
   email: string;
   password: string;
+  code: string;
   first_name?: string;
   last_name?: string;
+  phone?: string;
 }): Promise<{ token?: string; customer: Customer }> => {
-  // Step 1: create the auth identity — this alone does not create a queryable customer record.
-  const { token } = await apiRequest<{ token: string }>('/auth/customer/emailpass/register', {
-    method: 'POST',
-    body: JSON.stringify({ email: details.email, password: details.password }),
-  });
-  await setStoredToken(token);
-
-  // Step 2: create the customer record, linked to the auth identity via the bearer token.
-  const { customer } = await apiRequest<{ customer: Customer }>('/store/customers', {
+  const { customer } = await apiRequest<{ customer: Customer }>('/store/signup/complete', {
     method: 'POST',
     body: JSON.stringify({
       email: details.email,
+      password: details.password,
+      code: details.code,
       first_name: details.first_name,
       last_name: details.last_name,
+      phone: details.phone,
     }),
   });
 
-  // Step 3: the registration token has no actor_id until the customer record exists, and it
-  // isn't refreshed retroactively — re-login now to get a token actually scoped to this customer.
-  const { token: scopedToken } = await loginCustomer(details.email, details.password);
+  const { token } = await loginCustomer(details.email, details.password);
 
-  return { token: scopedToken, customer };
+  return { token, customer };
 };
 
 export const getCurrentCustomer = async (): Promise<Customer | null> => {

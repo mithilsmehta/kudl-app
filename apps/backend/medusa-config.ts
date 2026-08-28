@@ -223,7 +223,12 @@ const paymentModules = useRazorpay
 // above, they have no optional external dependency).
 //   - recommendation: activity events, related-products scoring config
 //   - pet: customer pet profiles collected by the storefront onboarding flow
-const customModules = [{ resolve: './src/modules/recommendation' }, { resolve: './src/modules/pet' }];
+//   - otp: one-time email codes for signup verification (see src/lib/otp.ts)
+const customModules = [
+  { resolve: './src/modules/recommendation' },
+  { resolve: './src/modules/pet' },
+  { resolve: './src/modules/otp' },
+];
 
 const modules = [...redisModules, ...fileModules, ...paymentModules, ...customModules];
 

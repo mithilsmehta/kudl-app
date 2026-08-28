@@ -21,11 +21,14 @@ interface AuthContextType {
   token: string | null
   isLoading: boolean
   login: (email: string, pass: string) => Promise<void>
+  /** Requires a verification code — see requestSignupOtp in lib/api.ts. */
   register: (details: {
     email: string
     password: string
+    code: string
     first_name?: string
     last_name?: string
+    phone?: string
   }) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -99,8 +102,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const register = async (details: {
     email: string
     password: string
+    code: string
     first_name?: string
     last_name?: string
+    phone?: string
   }) => {
     setIsLoading(true)
     try {
