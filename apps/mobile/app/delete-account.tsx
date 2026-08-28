@@ -109,7 +109,7 @@ export default function DeleteAccountScreen() {
                       kept === 1 ? 'order is' : 'orders are'
                     } kept as payment records.`
                   : 'Your account and all associated data have been deleted.',
-                [{ text: 'OK', onPress: () => router.replace('/(tabs)/profile') }]
+                [{ text: 'OK', onPress: () => router.replace('/(tabs)/profile') }],
               );
             } catch (e: any) {
               // Deletion failed, so the customer is still signed in and the guard
@@ -121,7 +121,7 @@ export default function DeleteAccountScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -134,11 +134,7 @@ export default function DeleteAccountScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.iconCircle}>
         <Feather name="alert-triangle" size={26} color="#ef4444" />
       </View>
@@ -160,24 +156,18 @@ export default function DeleteAccountScreen() {
         />
         <Bullet
           icon="heart"
-          text={
-            summary
-              ? `${summary.pets} pet ${summary.pets === 1 ? 'profile' : 'profiles'}`
-              : 'Your pet profiles'
-          }
+          text={summary ? `${summary.pets} pet ${summary.pets === 1 ? 'profile' : 'profiles'}` : 'Your pet profiles'}
         />
         <Bullet
           icon="activity"
           text={
-            summary
-              ? `${summary.activity_events} activity records used for recommendations`
-              : 'Your activity history'
+            summary ? `${summary.activity_events} activity records used for recommendations` : 'Your activity history'
           }
         />
         <Bullet icon="lock" text="Your sign-in credentials" isLast />
       </View>
 
-      <Text style={styles.blockLabel}>What we have to keep</Text>
+      {/* <Text style={styles.blockLabel}>What we have to keep</Text> */}
       <View style={[styles.card, styles.keepCard]}>
         <Bullet
           icon="file-text"

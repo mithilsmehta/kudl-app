@@ -73,7 +73,7 @@ export default function PrivacySecurityScreen() {
   useFocusEffect(
     React.useCallback(() => {
       if (user) load();
-    }, [user, load])
+    }, [user, load]),
   );
 
   const toggle = async (key: keyof PrivacySettings, value: boolean) => {
@@ -107,7 +107,7 @@ export default function PrivacySecurityScreen() {
                 'History cleared',
                 deleted
                   ? `${deleted} activity ${deleted === 1 ? 'record' : 'records'} deleted.`
-                  : 'There was nothing to clear.'
+                  : 'There was nothing to clear.',
               );
             } catch (e: any) {
               Alert.alert('Could not clear history', e?.message || 'Please try again.');
@@ -116,7 +116,7 @@ export default function PrivacySecurityScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -139,9 +139,7 @@ export default function PrivacySecurityScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.sectionLabel}>Your data</Text>
       <View style={styles.card}>
-        <Text style={styles.cardIntro}>
-          What KUDL currently stores against your account.
-        </Text>
+        <Text style={styles.cardIntro}>What KUDL currently stores against your account.</Text>
         <View style={styles.statGrid}>
           <Stat icon="package" label="Orders" value={summary?.orders ?? 0} />
           <Stat icon="map-pin" label="Addresses" value={summary?.addresses ?? 0} />
@@ -192,10 +190,7 @@ export default function PrivacySecurityScreen() {
           <Feather name="chevron-right" size={18} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.row, styles.rowLast]}
-          onPress={() => router.push('/change-email')}
-        >
+        <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => router.push('/change-email')}>
           <Feather name="mail" size={20} color="#374151" />
           <View style={styles.rowBody}>
             <Text style={styles.rowTitle}>Change sign-in email</Text>
@@ -207,11 +202,7 @@ export default function PrivacySecurityScreen() {
 
       <Text style={styles.sectionLabel}>Data controls</Text>
       <View style={styles.card}>
-        <TouchableOpacity
-          style={[styles.row, styles.rowLast]}
-          onPress={handleClearActivity}
-          disabled={isClearing}
-        >
+        <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={handleClearActivity} disabled={isClearing}>
           <Feather name="trash" size={20} color="#374151" />
           <View style={styles.rowBody}>
             <Text style={styles.rowTitle}>Clear activity history</Text>
@@ -229,13 +220,13 @@ export default function PrivacySecurityScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.infoCard}>
+      {/* <View style={styles.infoCard}>
         <Feather name="info" size={16} color="#1e40af" />
         <Text style={styles.infoText}>
           Your past orders are kept even if you delete your account. They are payment records, and
           we need them for GST returns, refunds and payment disputes.
         </Text>
-      </View>
+      </View> */}
 
       <TouchableOpacity
         style={styles.policyBtn}

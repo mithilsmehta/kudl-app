@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 /**
  * Account Settings — port of apps/mobile/app/account-settings.tsx.
@@ -19,97 +19,90 @@
  * storefront handles the same prompts.
  */
 
-import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
-import {
-  Mail,
-  Lock,
-  Shield,
-  Trash2,
-  ChevronRight,
-  CheckCircle,
-} from "@/components/icons"
-import { useAuth } from "@/context/AuthContext"
-import { useRequireAuth } from "@/lib/useRequireAuth"
-import ScreenHeader from "@/components/ScreenHeader"
-import Spinner from "@/components/Spinner"
-import ErrorBanner from "@/components/ErrorBanner"
-import FormField from "@/components/FormField"
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { Mail, Lock, Shield, Trash2, ChevronRight, CheckCircle } from '@/components/icons';
+import { useAuth } from '@/context/AuthContext';
+import { useRequireAuth } from '@/lib/useRequireAuth';
+import ScreenHeader from '@/components/ScreenHeader';
+import Spinner from '@/components/Spinner';
+import ErrorBanner from '@/components/ErrorBanner';
+import FormField from '@/components/FormField';
 
 export default function AccountSettingsPage() {
-  const { isReady } = useRequireAuth()
-  const { user, updateProfile, refreshUser } = useAuth()
+  const { isReady } = useRequireAuth();
+  const { user, updateProfile, refreshUser } = useAuth();
 
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [phone, setPhone] = useState("")
-  const [companyName, setCompanyName] = useState("")
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   // Re-seeds the form from the customer record whenever it changes — including
   // on the way back from the email page, so a just-changed address shows
   // immediately instead of the stale one this page loaded with.
   useEffect(() => {
-    if (!user) return
-    setFirstName(user.first_name || "")
-    setLastName(user.last_name || "")
-    setPhone(user.phone || "")
-    setCompanyName(user.company_name || "")
-  }, [user])
+    if (!user) return;
+    setFirstName(user.first_name || '');
+    setLastName(user.last_name || '');
+    setPhone(user.phone || '');
+    setCompanyName(user.company_name || '');
+  }, [user]);
 
   // The email row is rendered from `user`, and the email page changes it on the
   // server. Re-reading on mount covers coming back here after that change.
   useEffect(() => {
-    if (isReady) refreshUser()
+    if (isReady) refreshUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady])
+  }, [isReady]);
 
   const isDirty = useMemo(() => {
-    if (!user) return false
+    if (!user) return false;
     return (
-      firstName.trim() !== (user.first_name || "") ||
-      lastName.trim() !== (user.last_name || "") ||
-      phone.trim() !== (user.phone || "") ||
-      companyName.trim() !== (user.company_name || "")
-    )
-  }, [user, firstName, lastName, phone, companyName])
+      firstName.trim() !== (user.first_name || '') ||
+      lastName.trim() !== (user.last_name || '') ||
+      phone.trim() !== (user.phone || '') ||
+      companyName.trim() !== (user.company_name || '')
+    );
+  }, [user, firstName, lastName, phone, companyName]);
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSaved(false)
+    e.preventDefault();
+    setError(null);
+    setSaved(false);
 
     if (!firstName.trim() && !lastName.trim()) {
-      setError("Enter at least a first or last name.")
-      return
+      setError('Enter at least a first or last name.');
+      return;
     }
 
     // Deliberately loose: 10 digits after stripping spaces, dashes and a +91.
     // Indian mobile numbers get written half a dozen ways and rejecting a valid
     // one is worse than storing a slightly odd one.
-    const digits = phone.replace(/[^\d]/g, "").replace(/^91(?=\d{10}$)/, "")
+    const digits = phone.replace(/[^\d]/g, '').replace(/^91(?=\d{10}$)/, '');
     if (phone.trim() && digits.length !== 10) {
-      setError("Enter a 10-digit mobile number.")
-      return
+      setError('Enter a 10-digit mobile number.');
+      return;
     }
 
-    setIsSaving(true)
+    setIsSaving(true);
     try {
       await updateProfile({
         first_name: firstName,
         last_name: lastName,
-        phone: phone.trim() ? digits : "",
+        phone: phone.trim() ? digits : '',
         company_name: companyName,
-      })
-      setSaved(true)
+      });
+      setSaved(true);
     } catch (e: any) {
-      setError(e?.message || "Could not save your details. Please try again.")
+      setError(e?.message || 'Could not save your details. Please try again.');
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   if (!isReady || !user) {
     return (
@@ -119,7 +112,7 @@ export default function AccountSettingsPage() {
           <Spinner className="h-8 w-8 text-kudl-primary" />
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -128,10 +121,7 @@ export default function AccountSettingsPage() {
 
       <div className="mx-auto max-w-2xl p-4 md:px-6 md:pb-16">
         <SectionLabel>Personal details</SectionLabel>
-        <form
-          onSubmit={handleSave}
-          className="mb-6 rounded-kudl-card border border-kudl-border bg-white p-4 md:p-5"
-        >
+        <form onSubmit={handleSave} className="mb-6 rounded-kudl-card border border-kudl-border bg-white p-4 md:p-5">
           <div className="grid gap-4 md:grid-cols-2">
             <FormField
               label="First name"
@@ -158,12 +148,10 @@ export default function AccountSettingsPage() {
               inputMode="tel"
               autoComplete="tel"
             />
-            <p className="mt-1.5 text-xs text-kudl-muted">
-              Used for delivery updates and order calls.
-            </p>
+            <p className="mt-1.5 text-xs text-kudl-muted">Used for delivery updates and order calls.</p>
           </div>
 
-          <div className="mt-4">
+          {/* <div className="mt-4">
             <FormField
               label="Company (optional)"
               value={companyName}
@@ -171,15 +159,12 @@ export default function AccountSettingsPage() {
               placeholder="For GST invoices"
               autoComplete="organization"
             />
-          </div>
+          </div> */}
 
           <ErrorBanner message={error} />
 
           {saved && (
-            <p
-              role="status"
-              className="mt-3 flex items-center gap-2 text-[13px] font-medium text-green-700"
-            >
+            <p role="status" className="mt-3 flex items-center gap-2 text-[13px] font-medium text-green-700">
               <CheckCircle className="h-4 w-4" aria-hidden="true" />
               Your details have been updated.
             </p>
@@ -190,11 +175,7 @@ export default function AccountSettingsPage() {
             disabled={!isDirty || isSaving}
             className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-kudl-primary text-[15px] font-bold text-white transition-colors hover:bg-kudl-dark disabled:cursor-not-allowed disabled:bg-kudl-primary/40 md:w-auto md:px-8"
           >
-            {isSaving ? (
-              <Spinner className="h-5 w-5 text-white" label="Saving" />
-            ) : (
-              "Save changes"
-            )}
+            {isSaving ? <Spinner className="h-5 w-5 text-white" label="Saving" /> : 'Save changes'}
           </button>
         </form>
 
@@ -225,8 +206,7 @@ export default function AccountSettingsPage() {
         <div className="rounded-kudl-card border border-red-200 bg-red-50/40 p-4 md:p-5">
           <h2 className="text-[15px] font-bold text-red-700">Delete account</h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-red-900/80">
-            Permanently removes your profile, addresses, pets and activity history. Past orders
-            are kept as payment records, as required for tax and refunds.
+            Permanently removes your profile, addresses, pets and activity history.
           </p>
           <Link
             href="/delete-account"
@@ -238,15 +218,11 @@ export default function AccountSettingsPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="mb-2 mt-2 text-xs font-bold uppercase tracking-wide text-kudl-muted">
-      {children}
-    </h2>
-  )
+  return <h2 className="mb-2 mt-2 text-xs font-bold uppercase tracking-wide text-kudl-muted">{children}</h2>;
 }
 
 function MenuRow({
@@ -256,34 +232,27 @@ function MenuRow({
   value,
   isLast,
 }: {
-  href: string
-  icon: React.ReactNode
-  title: string
-  value: string
-  isLast?: boolean
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  isLast?: boolean;
 }) {
   return (
     <li>
       <Link
         href={href}
         className={`flex items-center gap-3 p-4 transition-colors hover:bg-kudl-bg ${
-          isLast ? "" : "border-b border-kudl-divider"
+          isLast ? '' : 'border-b border-kudl-divider'
         }`}
       >
         {icon}
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold text-kudl-ink">
-            {title}
-          </span>
-          <span className="mt-0.5 block truncate text-[13px] text-kudl-muted">
-            {value}
-          </span>
+          <span className="block text-[15px] font-semibold text-kudl-ink">{title}</span>
+          <span className="mt-0.5 block truncate text-[13px] text-kudl-muted">{value}</span>
         </span>
-        <ChevronRight
-          className="h-[18px] w-[18px] shrink-0 text-kudl-faint"
-          aria-hidden="true"
-        />
+        <ChevronRight className="h-[18px] w-[18px] shrink-0 text-kudl-faint" aria-hidden="true" />
       </Link>
     </li>
-  )
+  );
 }

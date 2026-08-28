@@ -59,7 +59,7 @@ export default function AccountSettingsScreen() {
   useFocusEffect(
     React.useCallback(() => {
       refreshUser();
-    }, [])
+    }, []),
   );
 
   const isDirty = useMemo(() => {
@@ -112,11 +112,7 @@ export default function AccountSettingsScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.sectionLabel}>Personal details</Text>
       <View style={styles.card}>
         <Text style={styles.label}>First name</Text>
@@ -147,25 +143,21 @@ export default function AccountSettingsScreen() {
         />
         <Text style={styles.hint}>Used for delivery updates and order calls.</Text>
 
-        <Text style={styles.label}>Company (optional)</Text>
+        {/* <Text style={styles.label}>Company (optional)</Text>
         <TextInput
           style={styles.input}
           value={companyName}
           onChangeText={setCompanyName}
           placeholder="For GST invoices"
           autoCapitalize="words"
-        />
+        /> */}
 
         <TouchableOpacity
           style={[styles.primaryBtn, (!isDirty || isSaving) && styles.primaryBtnDisabled]}
           onPress={handleSave}
           disabled={!isDirty || isSaving}
         >
-          {isSaving ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.primaryBtnText}>Save changes</Text>
-          )}
+          {isSaving ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.primaryBtnText}>Save changes</Text>}
         </TouchableOpacity>
       </View>
 
@@ -189,10 +181,7 @@ export default function AccountSettingsScreen() {
           <Feather name="chevron-right" size={18} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.row, styles.rowLast]}
-          onPress={() => router.push('/privacy-security')}
-        >
+        <TouchableOpacity style={[styles.row, styles.rowLast]} onPress={() => router.push('/privacy-security')}>
           <Feather name="shield" size={20} color="#374151" />
           <View style={styles.rowBody}>
             <Text style={styles.rowTitle}>Privacy & security</Text>
@@ -205,10 +194,7 @@ export default function AccountSettingsScreen() {
       <Text style={styles.sectionLabel}>Danger zone</Text>
       <View style={[styles.card, styles.dangerCard]}>
         <Text style={styles.dangerTitle}>Delete account</Text>
-        <Text style={styles.dangerText}>
-          Permanently removes your profile, addresses, pets and activity history. Past orders are
-          kept as payment records, as required for tax and refunds.
-        </Text>
+        <Text style={styles.dangerText}>Permanently removes your profile, addresses, pets and activity history.</Text>
         <TouchableOpacity style={styles.dangerBtn} onPress={() => router.push('/delete-account')}>
           <Feather name="trash-2" size={18} color="#ef4444" />
           <Text style={styles.dangerBtnText}>Delete my account</Text>

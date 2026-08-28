@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 /**
  * Privacy & Security — port of apps/mobile/app/privacy-security.tsx.
@@ -21,94 +21,83 @@
  * switch that lags a network round trip feels broken and gets clicked twice.
  */
 
-import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
-import {
-  Package,
-  MapPin,
-  Heart,
-  Activity,
-  Mail,
-  Star,
-  Lock,
-  Trash2,
-  Info,
-  ChevronRight,
-} from "@/components/icons"
-import { useAuth } from "@/context/AuthContext"
-import { useRequireAuth } from "@/lib/useRequireAuth"
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
+import { Package, MapPin, Heart, Activity, Mail, Star, Lock, Trash2, Info, ChevronRight } from '@/components/icons';
+import { useAuth } from '@/context/AuthContext';
+import { useRequireAuth } from '@/lib/useRequireAuth';
 import {
   PrivacyDataSummary,
   PrivacySettings,
   clearActivityHistory,
   getPrivacyOverview,
   updatePrivacySettings,
-} from "@/lib/api"
-import ScreenHeader from "@/components/ScreenHeader"
-import Spinner from "@/components/Spinner"
-import ErrorBanner from "@/components/ErrorBanner"
-import ConfirmDialog from "@/components/ConfirmDialog"
+} from '@/lib/api';
+import ScreenHeader from '@/components/ScreenHeader';
+import Spinner from '@/components/Spinner';
+import ErrorBanner from '@/components/ErrorBanner';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function PrivacySecurityPage() {
-  const { isReady } = useRequireAuth()
-  const { user } = useAuth()
+  const { isReady } = useRequireAuth();
+  const { user } = useAuth();
 
-  const [settings, setSettings] = useState<PrivacySettings | null>(null)
-  const [summary, setSummary] = useState<PrivacyDataSummary | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isClearing, setIsClearing] = useState(false)
-  const [confirmClear, setConfirmClear] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [settings, setSettings] = useState<PrivacySettings | null>(null);
+  const [summary, setSummary] = useState<PrivacyDataSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const overview = await getPrivacyOverview()
-      setSettings(overview.settings)
-      setSummary(overview.data_summary)
+      const overview = await getPrivacyOverview();
+      setSettings(overview.settings);
+      setSummary(overview.data_summary);
     } catch (e: any) {
-      setError(e?.message || "Could not load your settings.")
+      setError(e?.message || 'Could not load your settings.');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    if (isReady) load()
-  }, [isReady, load])
+    if (isReady) load();
+  }, [isReady, load]);
 
   const toggle = async (key: keyof PrivacySettings, value: boolean) => {
-    if (!settings) return
-    const previous = settings
-    setSettings({ ...settings, [key]: value })
-    setError(null)
+    if (!settings) return;
+    const previous = settings;
+    setSettings({ ...settings, [key]: value });
+    setError(null);
     try {
-      setSettings(await updatePrivacySettings({ [key]: value }))
+      setSettings(await updatePrivacySettings({ [key]: value }));
     } catch (e: any) {
-      setSettings(previous)
-      setError(e?.message || "Could not save that setting.")
+      setSettings(previous);
+      setError(e?.message || 'Could not save that setting.');
     }
-  }
+  };
 
   const handleClearActivity = async () => {
-    setConfirmClear(false)
-    setIsClearing(true)
-    setError(null)
-    setNotice(null)
+    setConfirmClear(false);
+    setIsClearing(true);
+    setError(null);
+    setNotice(null);
     try {
-      const deleted = await clearActivityHistory()
-      setSummary((s) => (s ? { ...s, activity_events: 0 } : s))
+      const deleted = await clearActivityHistory();
+      setSummary((s) => (s ? { ...s, activity_events: 0 } : s));
       setNotice(
         deleted
-          ? `${deleted} activity ${deleted === 1 ? "record" : "records"} deleted.`
-          : "There was nothing to clear."
-      )
+          ? `${deleted} activity ${deleted === 1 ? 'record' : 'records'} deleted.`
+          : 'There was nothing to clear.',
+      );
     } catch (e: any) {
-      setError(e?.message || "Could not clear your history.")
+      setError(e?.message || 'Could not clear your history.');
     } finally {
-      setIsClearing(false)
+      setIsClearing(false);
     }
-  }
+  };
 
   if (!isReady || !user || isLoading) {
     return (
@@ -118,15 +107,15 @@ export default function PrivacySecurityPage() {
           <Spinner className="h-8 w-8 text-kudl-primary" />
         </div>
       </div>
-    )
+    );
   }
 
   const memberSince = summary?.account_created_at
-    ? new Date(summary.account_created_at).toLocaleDateString("en-IN", {
-        month: "long",
-        year: "numeric",
+    ? new Date(summary.account_created_at).toLocaleDateString('en-IN', {
+        month: 'long',
+        year: 'numeric',
       })
-    : null
+    : null;
 
   return (
     <div>
@@ -135,9 +124,7 @@ export default function PrivacySecurityPage() {
       <div className="mx-auto max-w-2xl p-4 md:px-6 md:pb-16">
         <SectionLabel>Your data</SectionLabel>
         <div className="mb-6 rounded-kudl-card border border-kudl-border bg-white p-4 md:p-5">
-          <p className="text-[13px] text-kudl-muted">
-            What KUDL currently stores against your account.
-          </p>
+          <p className="text-[13px] text-kudl-muted">What KUDL currently stores against your account.</p>
           <div className="mt-3.5 grid grid-cols-2 gap-4 md:grid-cols-4">
             <Stat
               icon={<Package className="h-4 w-4 text-kudl-primary" aria-hidden="true" />}
@@ -174,25 +161,25 @@ export default function PrivacySecurityPage() {
             title="Promotional emails"
             description="Offers, new arrivals and pet care tips. Order and delivery updates are sent either way."
             checked={settings?.marketing_emails ?? true}
-            onChange={(v) => toggle("marketing_emails", v)}
+            onChange={(v) => toggle('marketing_emails', v)}
           />
           <ToggleRow
             icon={<Activity className="h-5 w-5 shrink-0 text-kudl-body" aria-hidden="true" />}
             title="Activity tracking"
             description="Lets us record what you view and buy. Turning this off stops new activity being saved."
             checked={settings?.activity_tracking ?? true}
-            onChange={(v) => toggle("activity_tracking", v)}
+            onChange={(v) => toggle('activity_tracking', v)}
           />
           <ToggleRow
             icon={<Star className="h-5 w-5 shrink-0 text-kudl-body" aria-hidden="true" />}
             title="Personalised recommendations"
             description={
               settings?.activity_tracking === false
-                ? "Uses your saved activity to pick products for you. Nothing new is being recorded while tracking is off."
-                : "Uses your saved activity to pick products for you. Turn off to see the same picks as everyone else."
+                ? 'Uses your saved activity to pick products for you. Nothing new is being recorded while tracking is off.'
+                : 'Uses your saved activity to pick products for you. Turn off to see the same picks as everyone else.'
             }
             checked={settings?.personalized_recommendations ?? true}
-            onChange={(v) => toggle("personalized_recommendations", v)}
+            onChange={(v) => toggle('personalized_recommendations', v)}
             isLast
           />
         </div>
@@ -224,22 +211,17 @@ export default function PrivacySecurityPage() {
           >
             <Trash2 className="h-5 w-5 shrink-0 text-kudl-body" aria-hidden="true" />
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-kudl-ink">
-                Clear activity history
-              </span>
+              <span className="block text-[15px] font-semibold text-kudl-ink">Clear activity history</span>
               <span className="mt-0.5 block text-[13px] text-kudl-muted">
                 {summary?.activity_events
                   ? `Delete ${summary.activity_events} saved activity records`
-                  : "Nothing saved right now"}
+                  : 'Nothing saved right now'}
               </span>
             </span>
             {isClearing ? (
               <Spinner className="h-[18px] w-[18px] text-kudl-primary" />
             ) : (
-              <ChevronRight
-                className="h-[18px] w-[18px] shrink-0 text-kudl-faint"
-                aria-hidden="true"
-              />
+              <ChevronRight className="h-[18px] w-[18px] shrink-0 text-kudl-faint" aria-hidden="true" />
             )}
           </button>
         </div>
@@ -251,13 +233,13 @@ export default function PrivacySecurityPage() {
           </p>
         )}
 
-        <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-kudl-tint p-3.5">
+        {/* <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-kudl-tint p-3.5">
           <Info className="mt-px h-4 w-4 shrink-0 text-kudl-dark" aria-hidden="true" />
           <p className="text-xs leading-relaxed text-kudl-darker">
             Your past orders are kept even if you delete your account. They are payment
             records, and we need them for GST returns, refunds and payment disputes.
           </p>
-        </div>
+        </div> */}
 
         {/*
           No "read the full privacy policy" link here on purpose: the storefront
@@ -284,33 +266,21 @@ export default function PrivacySecurityPage() {
         onCancel={() => setConfirmClear(false)}
       />
     </div>
-  )
+  );
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="mb-2 mt-2 text-xs font-bold uppercase tracking-wide text-kudl-muted">
-      {children}
-    </h2>
-  )
+  return <h2 className="mb-2 mt-2 text-xs font-bold uppercase tracking-wide text-kudl-muted">{children}</h2>;
 }
 
-function Stat({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: number
-}) {
+function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
     <div>
       {icon}
       <p className="mt-1.5 text-[22px] font-bold leading-none text-kudl-ink">{value}</p>
       <p className="mt-1 text-xs text-kudl-muted">{label}</p>
     </div>
-  )
+  );
 }
 
 /**
@@ -326,32 +296,21 @@ function ToggleRow({
   onChange,
   isLast,
 }: {
-  icon: React.ReactNode
-  title: string
-  description: string
-  checked: boolean
-  onChange: (value: boolean) => void
-  isLast?: boolean
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  isLast?: boolean;
 }) {
   return (
-    <label
-      className={`flex cursor-pointer items-center gap-3 py-3.5 ${
-        isLast ? "" : "border-b border-kudl-divider"
-      }`}
-    >
+    <label className={`flex cursor-pointer items-center gap-3 py-3.5 ${isLast ? '' : 'border-b border-kudl-divider'}`}>
       {icon}
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-semibold text-kudl-ink">{title}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-kudl-muted">
-          {description}
-        </span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-kudl-muted">{description}</span>
       </span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="peer sr-only"
-      />
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
       {/*
         The knob's position comes from `checked` rather than a peer-checked:
         variant. Tailwind compiles peer-checked: to `.peer:checked ~ &`, which
@@ -361,17 +320,17 @@ function ToggleRow({
       <span
         aria-hidden="true"
         className={`relative h-6 w-11 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-kudl-primary/40 peer-focus-visible:ring-offset-2 ${
-          checked ? "bg-kudl-primary" : "bg-kudl-hairline"
+          checked ? 'bg-kudl-primary' : 'bg-kudl-hairline'
         }`}
       >
         <span
           className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-            checked ? "translate-x-5" : "translate-x-0"
+            checked ? 'translate-x-5' : 'translate-x-0'
           }`}
         />
       </span>
     </label>
-  )
+  );
 }
 
 function MenuRow({
@@ -381,18 +340,18 @@ function MenuRow({
   value,
   isLast,
 }: {
-  href: string
-  icon: React.ReactNode
-  title: string
-  value: string
-  isLast?: boolean
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  isLast?: boolean;
 }) {
   return (
     <li>
       <Link
         href={href}
         className={`flex items-center gap-3 p-4 transition-colors hover:bg-kudl-bg ${
-          isLast ? "" : "border-b border-kudl-divider"
+          isLast ? '' : 'border-b border-kudl-divider'
         }`}
       >
         {icon}
@@ -400,11 +359,8 @@ function MenuRow({
           <span className="block text-[15px] font-semibold text-kudl-ink">{title}</span>
           <span className="mt-0.5 block truncate text-[13px] text-kudl-muted">{value}</span>
         </span>
-        <ChevronRight
-          className="h-[18px] w-[18px] shrink-0 text-kudl-faint"
-          aria-hidden="true"
-        />
+        <ChevronRight className="h-[18px] w-[18px] shrink-0 text-kudl-faint" aria-hidden="true" />
       </Link>
     </li>
-  )
+  );
 }
