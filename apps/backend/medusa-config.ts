@@ -208,10 +208,14 @@ const paymentModules = useRazorpay
     ]
   : [];
 
-// The recommendation engine's own module — activity events, related-products
-// scoring config, etc. Registered unconditionally (unlike the Redis/S3
-// modules above, it has no optional external dependency).
-const customModules = [{ resolve: './src/modules/recommendation' }];
+// Project modules. Registered unconditionally (unlike the Redis/S3 modules
+// above, they have no optional external dependency).
+//   - recommendation: activity events, related-products scoring config
+//   - pet: customer pet profiles collected by the storefront onboarding flow
+const customModules = [
+  { resolve: './src/modules/recommendation' },
+  { resolve: './src/modules/pet' },
+];
 
 const modules = [...redisModules, ...fileModules, ...paymentModules, ...customModules];
 

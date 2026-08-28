@@ -21,7 +21,10 @@ const getBackendUrl = () => {
     return explicit.replace(/\/+$/, '');
   }
 
-  const hostUri = Constants?.expoConfig?.hostUri || Constants?.manifest?.debuggerHost || Constants?.manifest2?.extra?.expoGo?.debuggerHost;
+  const hostUri =
+    Constants?.expoConfig?.hostUri ||
+    Constants?.manifest?.debuggerHost ||
+    Constants?.manifest2?.extra?.expoGo?.debuggerHost;
   if (hostUri) {
     const ip = String(hostUri).split(':')[0];
     if (ip) {
@@ -76,12 +79,9 @@ export const setStoredCartId = async (cartId: string | null): Promise<void> => {
 };
 
 // Fetch helper with headers
-async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getStoredToken();
-  
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(PUBLISHABLE_API_KEY ? { 'x-publishable-api-key': PUBLISHABLE_API_KEY } : {}),
@@ -166,7 +166,9 @@ export const getProducts = async (): Promise<Product[]> => {
   try {
     const regionId = await getDefaultRegionId();
     const regionParam = regionId ? `&region_id=${regionId}` : '';
-    const data = await apiRequest<{ products: Product[] }>(`/store/products?${PRODUCT_FIELDS}&limit=${PRODUCT_LIST_LIMIT}${regionParam}`);
+    const data = await apiRequest<{ products: Product[] }>(
+      `/store/products?${PRODUCT_FIELDS}&limit=${PRODUCT_LIST_LIMIT}${regionParam}`,
+    );
     return data.products || [];
   } catch (e) {
     console.log('Error fetching products:', e);
@@ -197,7 +199,9 @@ export const getProductById = async (id: string): Promise<Product | null> => {
  */
 export const getCategories = async (): Promise<Array<{ id: string; name: string }>> => {
   try {
-    const data = await apiRequest<{ product_categories: Array<{ id: string; name: string }> }>('/store/product-categories?parent_category_id=null&limit=20');
+    const data = await apiRequest<{ product_categories: Array<{ id: string; name: string }> }>(
+      '/store/product-categories?parent_category_id=null&limit=20',
+    );
     return data.product_categories || [];
   } catch (e) {
     return [];
@@ -211,9 +215,14 @@ export interface Customer {
   first_name?: string;
   last_name?: string;
   phone?: string;
+  company_name?: string;
+  created_at?: string;
 }
 
-export const loginCustomer = async (email: string, password: string): Promise<{ token: string; customer?: Customer }> => {
+export const loginCustomer = async (
+  email: string,
+  password: string,
+): Promise<{ token: string; customer?: Customer }> => {
   const data = await apiRequest<{ token: string; customer?: Customer }>('/auth/customer/emailpass', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
@@ -377,7 +386,9 @@ export const createCart = async (regionId?: string): Promise<Cart> => {
 
 export const getCart = async (cartId: string): Promise<Cart | null> => {
   try {
-    const data = await apiRequest<{ cart: Cart }>(`/store/carts/${cartId}?fields=*items,*shipping_methods,*region,*promotions`);
+    const data = await apiRequest<{ cart: Cart }>(
+      `/store/carts/${cartId}?fields=*items,*shipping_methods,*region,*promotions`,
+    );
     return data.cart || null;
   } catch (e) {
     return null;
@@ -436,15 +447,19 @@ export const removeCartItem = async (cartId: string, lineItemId: string): Promis
   return cart;
 };
 
-export const updateCartAddress = async (cartId: string, shippingAddress: {
-  first_name: string;
-  last_name: string;
-  address_1: string;
-  city: string;
-  country_code: string;
-  postal_code: string;
-  phone?: string;
-}, email?: string): Promise<Cart> => {
+export const updateCartAddress = async (
+  cartId: string,
+  shippingAddress: {
+    first_name: string;
+    last_name: string;
+    address_1: string;
+    city: string;
+    country_code: string;
+    postal_code: string;
+    phone?: string;
+  },
+  email?: string,
+): Promise<Cart> => {
   const body: any = {
     shipping_address: shippingAddress,
   };
@@ -537,7 +552,7 @@ export const applyCoupon = async (cartId: string, code: string): Promise<Cart> =
 export const removeCoupon = async (cartId: string, code: string): Promise<Cart> => {
   const data = await apiRequest<{ cart: Cart }>(
     `/store/carts/${cartId}/apply-coupon?code=${encodeURIComponent(code)}`,
-    { method: 'DELETE' }
+    { method: 'DELETE' },
   );
   return data.cart;
 };
@@ -552,7 +567,7 @@ export interface PaymentProvider {
 export const getPaymentProviders = async (regionId: string): Promise<PaymentProvider[]> => {
   try {
     const data = await apiRequest<{ payment_providers: PaymentProvider[] }>(
-      `/store/payment-providers?region_id=${encodeURIComponent(regionId)}`
+      `/store/payment-providers?region_id=${encodeURIComponent(regionId)}`,
     );
     return data.payment_providers || [];
   } catch (e) {
@@ -575,12 +590,15 @@ export interface PaymentSession {
 export const initiatePaymentSession = async (
   cartId: string,
   providerId: string = 'pp_system_default',
-  data?: Record<string, unknown>
+  data?: Record<string, unknown>,
 ): Promise<PaymentSession | null> => {
-  const { payment_collection } = await apiRequest<{ payment_collection: { id: string } }>('/store/payment-collections', {
-    method: 'POST',
-    body: JSON.stringify({ cart_id: cartId }),
-  });
+  const { payment_collection } = await apiRequest<{ payment_collection: { id: string } }>(
+    '/store/payment-collections',
+    {
+      method: 'POST',
+      body: JSON.stringify({ cart_id: cartId }),
+    },
+  );
   const res = await apiRequest<{
     payment_collection: { id: string; payment_sessions?: PaymentSession[] };
   }>(`/store/payment-collections/${payment_collection.id}/payment-sessions`, {
@@ -648,4 +666,148 @@ export const getOrderById = async (id: string): Promise<Order | null> => {
   } catch (e) {
     return null;
   }
+};
+
+// ---- Account settings ----
+//
+// Everything a customer can change about their own account, and the reason each
+// one is a different call rather than a single "save the customer" endpoint:
+// Medusa's `POST /store/customers/me` accepts only the harmless fields
+// (first_name, last_name, phone, company_name, metadata). Email is excluded
+// there because it is also the login identifier, and there is no store route for
+// the password at all. Both therefore go through dedicated backend routes that
+// can demand proof first.
+
+export type ProfileUpdate = {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  company_name?: string;
+};
+
+// Empty strings are sent as null rather than "": Medusa stores what it is given,
+// and a cleared phone field should become absent, not a blank string that then
+// renders as an empty line wherever the phone is shown.
+const blankToNull = (value?: string) => {
+  const trimmed = (value ?? '').trim();
+  return trimmed.length ? trimmed : null;
+};
+
+export const updateCustomerProfile = async (details: ProfileUpdate): Promise<Customer> => {
+  const data = await apiRequest<{ customer: Customer }>('/store/customers/me', {
+    method: 'POST',
+    body: JSON.stringify({
+      first_name: blankToNull(details.first_name),
+      last_name: blankToNull(details.last_name),
+      phone: blankToNull(details.phone),
+      company_name: blankToNull(details.company_name),
+    }),
+  });
+  return data.customer;
+};
+
+// Throws with the backend's message ("Your current password is incorrect.",
+// "...at least 8 characters") so the screen can show it verbatim.
+export const changeCustomerPassword = async (
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> => {
+  await apiRequest('/store/customers/me/password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+};
+
+export interface EmailChangeRequest {
+  pending_email: string;
+  requested_at: string;
+  /**
+   * Whether the backend will actually check the code entered at the next step.
+   * False until one-time-code delivery is wired up; the screen reads this to
+   * label the step honestly instead of showing a code box that accepts anything.
+   */
+  otp_required: boolean;
+  expires_in_seconds: number;
+}
+
+export const requestEmailChange = async (email: string): Promise<EmailChangeRequest> => {
+  return apiRequest<EmailChangeRequest>('/store/customers/me/email', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+};
+
+export const cancelEmailChange = async (): Promise<void> => {
+  await apiRequest('/store/customers/me/email', { method: 'DELETE' });
+};
+
+// `code` is accepted and forwarded now so the screen and the API agree on the
+// shape; the backend ignores it until verification is enabled.
+export const confirmEmailChange = async (code?: string): Promise<Customer> => {
+  const data = await apiRequest<{ customer: Customer }>('/store/customers/me/email/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+  return data.customer;
+};
+
+// ---- Privacy & security ----
+
+export interface PrivacySettings {
+  marketing_emails: boolean;
+  activity_tracking: boolean;
+  personalized_recommendations: boolean;
+}
+
+/** What the store holds about this customer, for the "Your data" summary. */
+export interface PrivacyDataSummary {
+  account_created_at: string;
+  orders: number;
+  addresses: number;
+  pets: number;
+  activity_events: number;
+}
+
+export const getPrivacyOverview = async (): Promise<{
+  settings: PrivacySettings;
+  data_summary: PrivacyDataSummary;
+}> => {
+  return apiRequest('/store/customers/me/privacy');
+};
+
+// Sends only the changed keys; the backend merges them over what is stored, so a
+// stale copy of the other toggles can never overwrite a newer value.
+export const updatePrivacySettings = async (
+  patch: Partial<PrivacySettings>,
+): Promise<PrivacySettings> => {
+  const data = await apiRequest<{ settings: PrivacySettings }>('/store/customers/me/privacy', {
+    method: 'POST',
+    body: JSON.stringify(patch),
+  });
+  return data.settings;
+};
+
+/** Deletes this customer's browsing/purchase activity. Returns how many rows went. */
+export const clearActivityHistory = async (): Promise<number> => {
+  const data = await apiRequest<{ deleted: number }>('/store/customers/me/privacy/activity', {
+    method: 'DELETE',
+  });
+  return data.deleted ?? 0;
+};
+
+export interface DeleteAccountResult {
+  deleted: boolean;
+  removed: { pets: number; activity_events: number };
+  /** Orders are kept as financial records — see the backend route's comment. */
+  retained: { orders: number };
+}
+
+// Irreversible. The caller must log out afterwards: the stored bearer token
+// still parses but no longer resolves to a customer, so every subsequent
+// authenticated call would fail in a confusing way.
+export const deleteCustomerAccount = async (password: string): Promise<DeleteAccountResult> => {
+  return apiRequest<DeleteAccountResult>('/store/customers/me/account/delete', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
 };

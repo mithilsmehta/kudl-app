@@ -43,7 +43,19 @@ function RegisterForm() {
         first_name: firstName,
         last_name: lastName,
       })
-      router.replace(next)
+      /*
+       * New customers go straight into pet onboarding rather than to `next`.
+       * The pet profile is what makes the rest of the store useful — food,
+       * treats and pharmacy suggestions all key off it — and the moment just
+       * after signing up is the only point where someone is already in a
+       * form-filling frame of mind.
+       *
+       * `next` is carried through rather than dropped, so the interruption is
+       * never a dead end: whatever the customer was heading for (checkout, a
+       * product, the profile by default) is where Skip and the final CTA both
+       * land them. Onboarding itself is fully skippable in one click.
+       */
+      router.replace(`/onboarding?next=${encodeURIComponent(next)}`)
     } catch (e: any) {
       setError(e?.message || "Could not register customer.")
     } finally {

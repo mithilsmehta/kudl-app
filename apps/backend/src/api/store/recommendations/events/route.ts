@@ -1,6 +1,7 @@
 import { MedusaResponse, MedusaStoreRequest } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { createRecommendationEventWorkflow } from "../../../../workflows/recommendation/create-recommendation-event"
+import { loadPrivacySettings } from "../../../../lib/customer-privacy"
 
 /**
  * Records one user-activity event for the recommendation engine (Phase 3).
@@ -115,6 +116,23 @@ export async function POST(
       )
     }
     metadata = body.metadata
+  }
+
+  /*
+   * Activity tracking is a per-customer choice (Privacy & Security in the app).
+   * A customer who turned it off gets a 202 rather than an error: the client is
+   * fire-and-forget telemetry and there is nothing for it to do about a refusal,
+   * so failing the call would only produce noise in the app's logs.
+   *
+   * Anonymous session events are unaffected — there is no account to hold a
+   * preference, and the session id is discarded by the client anyway.
+   */
+  if (customerId) {
+    const privacy = await loadPrivacySettings(req.scope, customerId)
+    if (!privacy.activity_tracking) {
+      res.status(202).json({ event: null, recorded: false })
+      return
+    }
   }
 
   const { result: event } = await createRecommendationEventWorkflow(

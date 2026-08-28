@@ -4,6 +4,7 @@ import { RECOMMENDATION_MODULE } from "../../../../modules/recommendation"
 import type RecommendationModuleService from "../../../../modules/recommendation/service"
 import { RECOMMENDATION_CONFIG } from "../../../../lib/recommendations/config"
 import { RecommendationCandidate } from "../../../../lib/recommendations/product-signals"
+import { loadPrivacySettings } from "../../../../lib/customer-privacy"
 import {
   buildAffinityProfile,
   scorePersonalized,
@@ -56,6 +57,24 @@ export async function GET(req: MedusaStoreRequest, res: MedusaResponse) {
   if (!customerId && !sessionId) {
     res.json({ product_ids: [], strategy: "personalized" })
     return
+  }
+
+  /*
+   * A signed-in customer can opt out of personalization without opting out of
+   * tracking (Privacy & Security in the app) — the two are separate settings
+   * because they answer different questions: "may you record this?" and "may you
+   * use it to rank what I see?".
+   *
+   * Opting out returns the same empty result as "no history yet", which the
+   * storefront's fallback chain already turns into Trending / Featured. So the
+   * customer keeps getting recommendations; they just stop being about them.
+   */
+  if (customerId) {
+    const privacy = await loadPrivacySettings(req.scope, customerId)
+    if (!privacy.personalized_recommendations) {
+      res.json({ product_ids: [], strategy: "personalized" })
+      return
+    }
   }
 
   const recommendationModuleService: RecommendationModuleService =

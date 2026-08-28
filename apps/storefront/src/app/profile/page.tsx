@@ -22,6 +22,7 @@ import { useAuth } from "@/context/AuthContext"
 import { MEDUSA_BACKEND_URL } from "@/lib/api"
 import ScreenHeader from "@/components/ScreenHeader"
 import ConfirmDialog from "@/components/ConfirmDialog"
+import MyPets from "@/components/onboarding/MyPets"
 
 export default function ProfilePage() {
   const { user, logout } = useAuth()
@@ -74,6 +75,13 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/*
+          Pets sit above the menu list because they are the part of this page a
+          customer actually comes back to change. Renders nothing when signed
+          out — every pet route is scoped to the auth token.
+        */}
+        <MyPets signedIn={Boolean(user)} />
+
         {/* Menu list */}
         <ul className="mb-4 overflow-hidden rounded-kudl-card border border-kudl-border bg-white">
           <li>
@@ -100,38 +108,29 @@ export default function ProfilePage() {
               <ChevronRight className="h-[18px] w-[18px] shrink-0 text-kudl-faint" aria-hidden="true" />
             </Link>
           </li>
-          {/*
-            Account Settings and Privacy & Security are inert in the app too —
-            there are no screens behind them yet. They're marked disabled here
-            rather than rendered as links that go nowhere.
-          */}
           <li>
-            <div
-              aria-disabled="true"
-              className="flex items-center gap-3 border-b border-kudl-divider p-4 opacity-50"
+            <Link
+              href={user ? "/account-settings" : "/login?next=/account-settings"}
+              className="flex items-center gap-3 border-b border-kudl-divider p-4 transition-colors hover:bg-kudl-bg"
             >
               <Settings className="h-5 w-5 shrink-0 text-kudl-body" aria-hidden="true" />
               <span className="flex-1 text-[15px] font-medium text-kudl-ink">
                 Account Settings
               </span>
-              <span className="text-[11px] font-semibold uppercase text-kudl-faint">
-                Soon
-              </span>
-            </div>
+              <ChevronRight className="h-[18px] w-[18px] shrink-0 text-kudl-faint" aria-hidden="true" />
+            </Link>
           </li>
           <li>
-            <div
-              aria-disabled="true"
-              className="flex items-center gap-3 p-4 opacity-50"
+            <Link
+              href={user ? "/privacy-security" : "/login?next=/privacy-security"}
+              className="flex items-center gap-3 p-4 transition-colors hover:bg-kudl-bg"
             >
               <Shield className="h-5 w-5 shrink-0 text-kudl-body" aria-hidden="true" />
               <span className="flex-1 text-[15px] font-medium text-kudl-ink">
                 Privacy &amp; Security
               </span>
-              <span className="text-[11px] font-semibold uppercase text-kudl-faint">
-                Soon
-              </span>
-            </div>
+              <ChevronRight className="h-[18px] w-[18px] shrink-0 text-kudl-faint" aria-hidden="true" />
+            </Link>
           </li>
         </ul>
 

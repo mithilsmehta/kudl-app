@@ -95,13 +95,19 @@ export default function ProfileScreen() {
           <Feather name="chevron-right" size={18} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push(user ? '/account-settings' : '/login')}
+        >
           <Feather name="settings" size={20} color="#374151" />
           <Text style={styles.menuText}>Account Settings</Text>
           <Feather name="chevron-right" size={18} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push(user ? '/privacy-security' : '/login')}
+        >
           <Feather name="shield" size={20} color="#374151" />
           <Text style={styles.menuText}>Privacy & Security</Text>
           <Feather name="chevron-right" size={18} color="#9ca3af" />

@@ -285,6 +285,8 @@ export interface Customer {
   first_name?: string
   last_name?: string
   phone?: string
+  company_name?: string
+  created_at?: string
 }
 
 export const loginCustomer = async (
@@ -697,6 +699,106 @@ export const removeCoupon = async (
   return data.cart
 }
 
+// Pets
+//
+// Backed by our own `pet` Medusa module (apps/backend/src/modules/pet) rather
+// than customer metadata, so a pet is a real queryable row. Every route derives
+// the owner from the auth token, so all of these require a signed-in customer —
+// apiRequest attaches the bearer token automatically.
+
+export interface Pet {
+  id: string
+  name: string
+  type: "dog" | "cat" | "bird" | "small_pet" | "reptile" | "other"
+  gender: "male" | "female"
+  avatar_url?: string | null
+  breed?: string | null
+  /** ISO date string, or null when the owner gave a stage/band instead. */
+  birthday?: string | null
+  life_stage?: "baby" | "young" | "adult" | "senior" | null
+  approx_age?:
+    | "under_six_months"
+    | "six_to_twelve_months"
+    | "one_to_two_years"
+    | "three_to_five_years"
+    | "five_to_seven_years"
+    | "over_seven_years"
+    | null
+  size?: "toy" | "small" | "medium" | "large" | null
+  allergies?: string[] | null
+  /** Tri-state: true / false / null for "not answered". */
+  spayed_neutered?: boolean | null
+  personality?: string[] | null
+  created_at?: string
+}
+
+/** The fields a client may write. `id` and ownership are never client-supplied. */
+export type PetDraft = Omit<Pet, "id" | "created_at">
+
+export const getPets = async (): Promise<Pet[]> => {
+  try {
+    const data = await apiRequest<{ pets: Pet[] }>("/store/pets")
+    return data.pets || []
+  } catch (e) {
+    console.log("Error fetching pets:", e)
+    return []
+  }
+}
+
+/**
+ * Errors are rethrown rather than swallowed, unlike getPets. A failed read can
+ * degrade to an empty list, but a failed save must reach the customer — quietly
+ * returning null would show a success state for a pet that was never stored.
+ */
+export const createPet = async (draft: PetDraft): Promise<Pet> => {
+  const data = await apiRequest<{ pet: Pet }>("/store/pets", {
+    method: "POST",
+    body: JSON.stringify(draft),
+  })
+  return data.pet
+}
+
+/**
+ * Partial update: only the keys present in `changes` are written, so a form
+ * that renders a subset of fields cannot blank the rest.
+ */
+export const updatePet = async (
+  petId: string,
+  changes: Partial<PetDraft>
+): Promise<Pet> => {
+  const data = await apiRequest<{ pet: Pet }>(`/store/pets/${petId}`, {
+    method: "POST",
+    body: JSON.stringify(changes),
+  })
+  return data.pet
+}
+
+/**
+ * Uploads a pet photo and returns its public URL.
+ *
+ * Sends base64 JSON rather than multipart because the backend route takes it
+ * that way — see the note there about avoiding multer for a single endpoint.
+ * FileReader gives us a data URL; the route accepts that form directly.
+ */
+export const uploadPetAvatar = async (file: File): Promise<string> => {
+  const content = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error("Could not read that file."))
+    reader.readAsDataURL(file)
+  })
+
+  const data = await apiRequest<{ url: string }>("/store/pets/avatar", {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  })
+  return data.url
+}
+
+export const deletePet = async (petId: string): Promise<void> => {
+  await apiRequest(`/store/pets/${petId}`, { method: "DELETE" })
+}
+
 export interface PaymentProvider {
   id: string
   is_enabled?: boolean
@@ -830,4 +932,169 @@ export const getOrderById = async (id: string): Promise<Order | null> => {
   } catch (e) {
     return null
   }
+}
+
+// ---- Account settings ----
+//
+// Port of the same block in apps/mobile/src/services/api.ts, against the same
+// backend routes. Each change is a separate call because each needs a different
+// amount of proof: Medusa's `POST /store/customers/me` accepts only the harmless
+// fields (first_name, last_name, phone, company_name, metadata). Email is
+// excluded there because it doubles as the login identifier, and there is no
+// store route for the password at all — so both go through dedicated backend
+// routes that can demand proof first.
+
+export type ProfileUpdate = {
+  first_name?: string
+  last_name?: string
+  phone?: string
+  company_name?: string
+}
+
+// Empty strings are sent as null rather than "": a cleared phone field should
+// become absent, not a blank string that renders as an empty line.
+const blankToNull = (value?: string) => {
+  const trimmed = (value ?? "").trim()
+  return trimmed.length ? trimmed : null
+}
+
+export const updateCustomerProfile = async (
+  details: ProfileUpdate
+): Promise<Customer> => {
+  const data = await apiRequest<{ customer: Customer }>(
+    "/store/customers/me",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        first_name: blankToNull(details.first_name),
+        last_name: blankToNull(details.last_name),
+        phone: blankToNull(details.phone),
+        company_name: blankToNull(details.company_name),
+      }),
+    }
+  )
+  return data.customer
+}
+
+// Throws with the backend's message ("Your current password is incorrect.",
+// "...at least 8 characters") so the page can show it verbatim in an ErrorBanner.
+export const changeCustomerPassword = async (
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  await apiRequest("/store/customers/me/password", {
+    method: "POST",
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  })
+}
+
+export interface EmailChangeRequest {
+  pending_email: string
+  requested_at: string
+  /**
+   * Whether the backend will actually check the code entered at the next step.
+   * False until one-time-code delivery is wired up; the page reads this to label
+   * the step honestly instead of showing a code box that accepts anything.
+   */
+  otp_required: boolean
+  expires_in_seconds: number
+}
+
+export const requestEmailChange = async (
+  email: string
+): Promise<EmailChangeRequest> => {
+  return apiRequest<EmailChangeRequest>("/store/customers/me/email", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  })
+}
+
+export const cancelEmailChange = async (): Promise<void> => {
+  await apiRequest("/store/customers/me/email", { method: "DELETE" })
+}
+
+// `code` is accepted and forwarded now so the page and the API agree on the
+// shape; the backend ignores it until verification is enabled.
+export const confirmEmailChange = async (code?: string): Promise<Customer> => {
+  const data = await apiRequest<{ customer: Customer }>(
+    "/store/customers/me/email/confirm",
+    {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }
+  )
+  return data.customer
+}
+
+// ---- Privacy & security ----
+
+export interface PrivacySettings {
+  marketing_emails: boolean
+  activity_tracking: boolean
+  personalized_recommendations: boolean
+}
+
+/** What the store holds about this customer, for the "Your data" summary. */
+export interface PrivacyDataSummary {
+  account_created_at: string
+  orders: number
+  addresses: number
+  pets: number
+  activity_events: number
+}
+
+export const getPrivacyOverview = async (): Promise<{
+  settings: PrivacySettings
+  data_summary: PrivacyDataSummary
+}> => {
+  return apiRequest("/store/customers/me/privacy")
+}
+
+// Sends only the changed keys; the backend merges them over what is stored, so a
+// stale copy of the other toggles can never overwrite a newer value.
+export const updatePrivacySettings = async (
+  patch: Partial<PrivacySettings>
+): Promise<PrivacySettings> => {
+  const data = await apiRequest<{ settings: PrivacySettings }>(
+    "/store/customers/me/privacy",
+    {
+      method: "POST",
+      body: JSON.stringify(patch),
+    }
+  )
+  return data.settings
+}
+
+/** Deletes this customer's browsing/purchase activity. Returns how many rows went. */
+export const clearActivityHistory = async (): Promise<number> => {
+  const data = await apiRequest<{ deleted: number }>(
+    "/store/customers/me/privacy/activity",
+    { method: "DELETE" }
+  )
+  return data.deleted ?? 0
+}
+
+export interface DeleteAccountResult {
+  deleted: boolean
+  removed: { pets: number; activity_events: number }
+  /** Orders are kept as financial records — see the backend route's comment. */
+  retained: { orders: number }
+}
+
+// Irreversible. The caller must log out afterwards: the stored bearer token
+// still parses but no longer resolves to a customer, so every subsequent
+// authenticated call would fail in a confusing way.
+export const deleteCustomerAccount = async (
+  password: string
+): Promise<DeleteAccountResult> => {
+  return apiRequest<DeleteAccountResult>(
+    "/store/customers/me/account/delete",
+    {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }
+  )
 }

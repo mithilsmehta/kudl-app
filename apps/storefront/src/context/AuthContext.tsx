@@ -5,11 +5,15 @@
 import React, { createContext, useContext, useState, useEffect } from "react"
 import {
   Customer,
+  DeleteAccountResult,
+  ProfileUpdate,
+  deleteCustomerAccount,
   getCurrentCustomer,
   getStoredToken,
   loginCustomer,
   registerCustomer,
   setStoredToken,
+  updateCustomerProfile,
 } from "@/lib/api"
 
 interface AuthContextType {
@@ -25,6 +29,15 @@ interface AuthContextType {
   }) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+  /** Saves the editable profile fields and puts the result straight into state. */
+  updateProfile: (details: ProfileUpdate) => Promise<Customer>
+  /**
+   * Deletes the account server-side and then signs out locally. Both halves
+   * belong together: the stored token still parses after the customer row is
+   * gone, so leaving it behind would keep the app in a "logged in" state where
+   * every authenticated request fails.
+   */
+  deleteAccount: (password: string) => Promise<DeleteAccountResult>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -35,6 +48,12 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => {},
   logout: async () => {},
   refreshUser: async () => {},
+  updateProfile: async () => {
+    throw new Error("AuthProvider is missing")
+  },
+  deleteAccount: async () => {
+    throw new Error("AuthProvider is missing")
+  },
 })
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -104,9 +123,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }
 
+  /*
+   * No isLoading toggle here, unlike login/register. Those gate the whole app on
+   * a loading state; this is a form submit on a settings page, and flipping the
+   * global flag would unmount the page the customer is still looking at.
+   */
+  const updateProfile = async (details: ProfileUpdate) => {
+    const updated = await updateCustomerProfile(details)
+    setUser(updated)
+    return updated
+  }
+
+  const deleteAccount = async (password: string) => {
+    const result = await deleteCustomerAccount(password)
+    await logout()
+    return result
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, token, isLoading, login, register, logout, refreshUser }}
+      value={{
+        user,
+        token,
+        isLoading,
+        login,
+        register,
+        logout,
+        refreshUser,
+        updateProfile,
+        deleteAccount,
+      }}
     >
       {children}
     </AuthContext.Provider>

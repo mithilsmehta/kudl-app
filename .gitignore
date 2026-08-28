@@ -62,3 +62,7 @@ yarn-error.log*
 ehthumbs.db
 Thumbs.db
 **/.DS_Store
+
+# Medusa's local file provider writes uploads here (see the fileModules block in
+# apps/backend/medusa-config.ts). Local dev artefacts, never source.
+apps/backend/static/
